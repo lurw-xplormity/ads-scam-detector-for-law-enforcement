@@ -117,7 +117,7 @@ with st.sidebar:
     st.header("🔧 Controls")
 
     # Add info note about crawler schedule
-    st.info("📅 **Note:** The crawler automatically scrapes new data every week to keep the database updated with the latest ads.")
+    st.info("📅 **Note:** The crawler automatically scrapes new data 3 days to keep the database updated with the latest ads.")
 
     # Refresh data button
     if st.button("🔄 Refresh Data", type="primary"):
