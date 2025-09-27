@@ -42,13 +42,86 @@ st.set_page_config(
     }
 )
 
-# Minimal styling - only essential tweaks
+# Professional Streamlit styling
 st.markdown("""
 <style>
+    /* Main app background */
+    .stApp {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
+    
+    /* Header styling */
+    .main-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    /* Sidebar enhancements */
+    .css-1d391kg {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Metric cards */
+    div[data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    /* Dataframe styling */
+    .stDataFrame {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    /* Button enhancements */
+    .stButton > button {
+        border-radius: 8px;
+        border: none;
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    /* Success/Error/Warning boxes */
+    .stSuccess, .stError, .stWarning, .stInfo {
+        border-radius: 10px;
+        border-left: 5px solid;
+    }
+    
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display: none;}
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.3);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.5);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -288,12 +361,16 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
 
 # UI Components
 def render_header():
-    """Render application header using native Streamlit components"""
-    st.title("🛡️ Cybercrime Detection Dashboard")
-    st.subheader("Advanced Threat Intelligence & Law Enforcement Platform")
+    """Render application header"""
+    st.markdown("""
+    <div class="main-header">
+        <h1>🛡️ Cybercrime Detection Dashboard</h1>
+        <p>Advanced Threat Intelligence & Law Enforcement Platform</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_system_status():
-    """Render system status using native Streamlit components"""
+    """Render system status indicators"""
     st.subheader("📡 System Status")
     
     # Test API connectivity
@@ -496,7 +573,7 @@ def render_filters():
                     )
 
 def render_metrics(df: pd.DataFrame):
-    """Render key performance metrics using Streamlit metrics"""
+    """Render key performance metrics"""
     st.subheader("📊 Intelligence Overview")
     
     try:
@@ -546,7 +623,7 @@ def render_metrics(df: pd.DataFrame):
         st.error(f"Error calculating metrics: {str(e)}")
 
 def render_overview_charts(df: pd.DataFrame):
-    """Render overview charts using Plotly"""
+    """Render overview charts with error handling"""
     if len(df) == 0:
         return
     
@@ -562,7 +639,9 @@ def render_overview_charts(df: pd.DataFrame):
                     fig_threats = px.pie(
                         values=threat_counts.values,
                         names=["✅ Safe" if not x else "🚨 Threat" for x in threat_counts.index],
-                        title="Threat Classification"
+                        title="Threat Classification",
+                        color_discrete_map={"🚨 Threat": "#ff6b6b", "✅ Safe": "#51cf66"},
+                        hole=0.4
                     )
                     fig_threats.update_traces(textposition="inside", textinfo="percent+label")
                     fig_threats.update_layout(height=300)
@@ -575,10 +654,13 @@ def render_overview_charts(df: pd.DataFrame):
                 level_counts = threat_levels.value_counts()
                 
                 if not level_counts.empty:
+                    colors = {"HIGH": "#ff6b6b", "MEDIUM": "#ffa502", "LOW": "#26de81", "OTHER": "#a4b0be", "UNKNOWN": "#6c757d"}
                     fig_levels = px.bar(
                         x=level_counts.index,
                         y=level_counts.values,
-                        title="Threat Severity"
+                        title="Threat Severity",
+                        color=level_counts.index,
+                        color_discrete_map=colors
                     )
                     fig_levels.update_layout(height=300, showlegend=False)
                     st.plotly_chart(fig_levels, use_container_width=True)
@@ -592,7 +674,9 @@ def render_overview_charts(df: pd.DataFrame):
                     fig_status = px.pie(
                         values=status_counts.values,
                         names=status_counts.index,
-                        title="Enforcement Status"
+                        title="Enforcement Status",
+                        color_discrete_map={"📧 Reported": "#51cf66", "⏳ Pending": "#ffa502"},
+                        hole=0.4
                     )
                     fig_status.update_traces(textposition="inside", textinfo="percent+label")
                     fig_status.update_layout(height=300)
@@ -1076,7 +1160,8 @@ def render_analytics_view(df: pd.DataFrame):
                         y="count", 
                         color="is_scam",
                         title="Daily Threat Detection Timeline",
-                        labels={"date_scraped": "Date", "count": "Cases", "is_scam": "Is Threat"}
+                        labels={"date_scraped": "Date", "count": "Cases", "is_scam": "Is Threat"},
+                        color_discrete_map={True: "#ff6b6b", False: "#51cf66"}
                     )
                     fig_timeline.update_layout(height=400)
                     st.plotly_chart(fig_timeline, use_container_width=True)
@@ -1095,7 +1180,9 @@ def render_analytics_view(df: pd.DataFrame):
                             x=scam_types.values,
                             y=scam_types.index,
                             orientation="h",
-                            title="Top Threat Types"
+                            title="Top Threat Types",
+                            color=scam_types.values,
+                            color_continuous_scale="Reds"
                         )
                         fig_types.update_layout(height=400, showlegend=False)
                         st.plotly_chart(fig_types, use_container_width=True)
@@ -1115,7 +1202,9 @@ def render_analytics_view(df: pd.DataFrame):
                     fig_reports = px.bar(
                         x=report_dist.index,
                         y=report_dist.values,
-                        title="Citizen Report Distribution"
+                        title="Citizen Report Distribution",
+                        color=report_dist.values,
+                        color_continuous_scale="Blues"
                     )
                     fig_reports.update_layout(height=400, showlegend=False)
                     st.plotly_chart(fig_reports, use_container_width=True)
@@ -1138,6 +1227,7 @@ def render_analytics_view(df: pd.DataFrame):
                         x="reach_category",
                         y=[True, False],
                         title="Social Reach vs Threat Status",
+                        color_discrete_map={True: "#ff6b6b", False: "#51cf66"},
                         barmode="stack"
                     )
                     fig_reach.update_layout(height=400)
@@ -1272,14 +1362,17 @@ def main():
         
         # Footer
         st.divider()
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem;">
-            <h4>🛡️ Cybercrime Detection Dashboard</h4>
-            <p><strong>AI-Powered • Real-time • Secure</strong></p>
-            <p><em>Protecting citizens through advanced threat intelligence</em></p>
-            <small>© 2024 Cybercrime Intelligence Unit</small>
-        </div>
-        """, unsafe_allow_html=True)
+        footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
+        
+        with footer_col2:
+            st.markdown("""
+            <div style="text-align: center; padding: 1rem;">
+                <h4>🛡️ Cybercrime Detection Dashboard</h4>
+                <p><strong>AI-Powered • Real-time • Secure</strong></p>
+                <p><em>Protecting citizens through advanced threat intelligence</em></p>
+                <small>© 2024 Cybercrime Intelligence Unit</small>
+            </div>
+            """, unsafe_allow_html=True)
             
     except Exception as e:
         logger.error(f"Critical application error: {e}")
