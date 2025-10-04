@@ -27,12 +27,19 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
         color: #1f77b4;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
     }
     .metric-card {
         background-color: #f0f2f6;
@@ -113,6 +120,90 @@ st.markdown(
         font-size: 0.9rem;
         line-height: 1.4rem;
     }
+    .info-section {
+        background-color: rgba(31, 119, 180, 0.08);
+        border-left: 4px solid #1f77b4;
+        padding: 1rem 1.25rem;
+        margin: 1rem 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+    }
+    .info-section.summary {
+        border-left-color: #17a2b8;
+        background-color: rgba(23, 162, 184, 0.08);
+    }
+    .info-section.links {
+        border-left-color: #6610f2;
+        background-color: rgba(102, 16, 242, 0.08);
+    }
+    .info-section.patterns {
+        border-left-color: #fd7e14;
+        background-color: rgba(253, 126, 20, 0.08);
+    }
+    .info-section.red-flags {
+        border-left-color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .info-section.recommendations {
+        border-left-color: #28a745;
+        background-color: rgba(40, 167, 69, 0.08);
+    }
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        opacity: 0.95;
+    }
+    .info-item {
+        padding: 0.5rem 0;
+        margin-left: 1rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        opacity: 0.9;
+    }
+    .info-item::before {
+        content: "•";
+        color: #1f77b4;
+        font-weight: bold;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+    .info-section.summary .info-item::before {
+        color: #17a2b8;
+    }
+    .info-section.links .info-item::before {
+        color: #8b5cf6;
+    }
+    .info-section.patterns .info-item::before {
+        color: #fd7e14;
+    }
+    .info-section.red-flags .info-item::before {
+        color: #ff6b6b;
+    }
+    .info-section.recommendations .info-item::before {
+        color: #51cf66;
+    }
+    .info-item a {
+        color: #4dabf7;
+        text-decoration: none;
+        word-break: break-all;
+    }
+    .info-item a:hover {
+        text-decoration: underline;
+        color: #74c0fc;
+    }
+    .empty-section {
+        font-style: italic;
+        padding: 0.5rem 0;
+        opacity: 0.7;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -127,6 +218,7 @@ if "current_page" not in st.session_state:
     st.session_state.current_page = 1
 if "rows_per_page" not in st.session_state:
     st.session_state.rows_per_page = 50
+
 
 # --- Data Loading Helper (moved up so sidebar can use data on first render) ---
 def load_initial_data():
@@ -143,6 +235,7 @@ def load_initial_data():
             st.error(f"Error loading data: {str(e)}")
     return st.session_state.data
 
+
 # Pre-load data BEFORE building sidebar so filters appear immediately
 load_initial_data()
 
@@ -151,20 +244,23 @@ st.markdown(
     '<h1 class="main-header">🛡️ Scam Detection Dashboard</h1>', unsafe_allow_html=True
 )
 
+# Add spacing after header
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Sidebar
 with st.sidebar:
     st.header("🔧 Controls")
 
     # Add info note about crawler schedule
-    st.info("📅 **Note:** The crawler automatically scrapes new data 3 days to keep the database updated with the latest ads.")
+    st.info(
+        "📅 **Note:** The crawler automatically scrapes new data 3 days to keep the database updated with the latest ads."
+    )
 
     # Refresh data button
     if st.button("🔄 Refresh Data", type="primary"):
         with st.spinner("Fetching latest data..."):
             try:
-                response = requests.get(
-                    MAIN_URL
-                )
+                response = requests.get(MAIN_URL)
                 if response.status_code == 200:
                     res_data = response.json()
                     st.session_state.data = res_data.get("data", [])
@@ -180,11 +276,11 @@ with st.sidebar:
     # Pagination settings
     st.header("📄 Pagination")
     rows_per_page = st.selectbox(
-            "Rows per page",
-            [5, 10, 20, 50],
-            index=3,  # Default to 50 (index=3 corresponds to 50)
-            key="rows_per_page_selector",
-        )
+        "Rows per page",
+        [5, 10, 20, 50],
+        index=3,  # Default to 50 (index=3 corresponds to 50)
+        key="rows_per_page_selector",
+    )
     st.session_state.rows_per_page = rows_per_page
 
     # Filters
@@ -195,8 +291,9 @@ with st.sidebar:
 
         # Scam filter
         scam_filter = st.selectbox(
-            "Filter by Scam Status", ["All", "Scam Only", "Legit Only"],
-            key="_scam_filter_widget"
+            "Filter by Scam Status",
+            ["All", "Scam Only", "Legit Only"],
+            key="_scam_filter_widget",
         )
         st.session_state["scam_filter"] = scam_filter
 
@@ -207,7 +304,10 @@ with st.sidebar:
         # Date range filter (with option to keep rows that have missing/invalid dates)
         if "date_scraped" in df.columns:
             parsed_dates_preview = pd.to_datetime(
-                df["date_scraped"], errors="coerce", infer_datetime_format=True, utc=True
+                df["date_scraped"],
+                errors="coerce",
+                infer_datetime_format=True,
+                utc=True,
             )
             include_missing_dates = st.checkbox(
                 "Include rows with missing/invalid dates",
@@ -250,31 +350,42 @@ with st.sidebar:
 
     # Threat level filter now (after date filtering so counts reflect visible data)
     if deferred_threat_needed:
-            base_levels = ["HIGH", "MEDIUM", "LOW"]
-            tl_raw_preview = df["threat_level"]
-            tl_upper_preview = tl_raw_preview.astype(str).str.upper().str.strip()
-            other_mask_preview = (~tl_upper_preview.isin(base_levels)) | tl_raw_preview.isna() | (tl_upper_preview == "")
-            threat_category_preview = tl_upper_preview.where(~other_mask_preview, "OTHER")
-            options = [lvl for lvl in base_levels if (threat_category_preview == lvl).any()]
-            if (threat_category_preview == "OTHER").any():
-                options.append("OTHER")
-            prev_tf = st.session_state.get("threat_filter")
-            default_opts = prev_tf if prev_tf else options
-            threat_filter = st.multiselect(
-                "Filter by Threat Level", options, default=default_opts,
-                help="OTHER groups all non HIGH / MEDIUM / LOW values (including blanks, nulls, malformed).",
-                key="_threat_filter_widget"
-            )
-            st.session_state["threat_filter"] = threat_filter
-            st.session_state["_other_threat_values"] = (
-                sorted(set(tl_raw_preview[other_mask_preview].dropna().astype(str))) if other_mask_preview.any() else []
-            )
-            with st.expander("Threat Level Counts (debug)"):
-                counts = threat_category_preview.value_counts(dropna=False)
-                for cat, val in counts.items():
-                    st.write(f"{cat}: {val}")
-                if st.session_state["_other_threat_values"]:
-                    st.caption("OTHER includes raw values: " + ", ".join(st.session_state["_other_threat_values"]))
+        base_levels = ["HIGH", "MEDIUM", "LOW"]
+        tl_raw_preview = df["threat_level"]
+        tl_upper_preview = tl_raw_preview.astype(str).str.upper().str.strip()
+        other_mask_preview = (
+            (~tl_upper_preview.isin(base_levels))
+            | tl_raw_preview.isna()
+            | (tl_upper_preview == "")
+        )
+        threat_category_preview = tl_upper_preview.where(~other_mask_preview, "OTHER")
+        options = [lvl for lvl in base_levels if (threat_category_preview == lvl).any()]
+        if (threat_category_preview == "OTHER").any():
+            options.append("OTHER")
+        prev_tf = st.session_state.get("threat_filter")
+        default_opts = prev_tf if prev_tf else options
+        threat_filter = st.multiselect(
+            "Filter by Threat Level",
+            options,
+            default=default_opts,
+            help="OTHER groups all non HIGH / MEDIUM / LOW values (including blanks, nulls, malformed).",
+            key="_threat_filter_widget",
+        )
+        st.session_state["threat_filter"] = threat_filter
+        st.session_state["_other_threat_values"] = (
+            sorted(set(tl_raw_preview[other_mask_preview].dropna().astype(str)))
+            if other_mask_preview.any()
+            else []
+        )
+        with st.expander("Threat Level Counts (debug)"):
+            counts = threat_category_preview.value_counts(dropna=False)
+            for cat, val in counts.items():
+                st.write(f"{cat}: {val}")
+            if st.session_state["_other_threat_values"]:
+                st.caption(
+                    "OTHER includes raw values: "
+                    + ", ".join(st.session_state["_other_threat_values"])
+                )
 
 # Main content
 
@@ -305,6 +416,66 @@ def report_to_police(ad_id):
             st.error(f"❌ Failed to report. Status code: {response.status_code}")
     except Exception as e:
         st.error(f"❌ Error reporting to police: {str(e)}")
+
+
+def display_list_section(row_data, field_key, title, icon, section_class=""):
+    """
+    Helper function to display a list section in the detailed view.
+    Handles both list and string values gracefully with enhanced styling.
+
+    Args:
+        row_data: The data dictionary
+        field_key: The key to look up in row_data
+        title: The section title to display
+        icon: The emoji icon for the section
+        section_class: CSS class for styling (summary, links, patterns, red-flags, recommendations)
+    """
+    import json
+
+    # Normalize to list
+    items = row_data.get(field_key)
+
+    if not items:
+        return
+
+    # try json parsing if it's a string
+    try:
+        if isinstance(items, str):
+            parsed = json.loads(items)
+            if isinstance(parsed, list):
+                items = parsed
+    except Exception:
+        pass
+
+    if not isinstance(items, list):
+        items = [items]
+
+    # Filter out empty items
+    items = [item for item in items if item]
+
+    if not items:
+        return
+
+    # Create the section HTML
+    items_html = ""
+    for item in items:
+        item_str = str(item).strip()
+        # Check if item is a URL for links section
+        if section_class == "links" and (
+            item_str.startswith("http://") or item_str.startswith("https://")
+        ):
+            items_html += f'<div class="info-item"><a href="{item_str}" target="_blank">{item_str}</a></div>'
+        else:
+            items_html += f'<div class="info-item">{item_str}</div>'
+
+    section_html = f"""
+    <div class="info-section {section_class}">
+        <div class="section-title">{icon} {title}</div>
+        {items_html}
+    </div>
+    """
+
+    st.markdown(section_html, unsafe_allow_html=True)
 
 
 def show_detailed_view(row_data):
@@ -353,67 +524,24 @@ def show_detailed_view(row_data):
     # Ad Text
     if row_data.get("ad_text"):
         st.subheader("📝 Ad Text")
-        st.text_area("Ad Text", value=row_data["ad_text"], height=100, disabled=True)
+        st.text_area("Ad Text", value=row_data["ad_text"], height=300, disabled=True)
 
     # Explanation
     if row_data.get("explanation"):
         st.subheader("💡 Analysis Explanation")
         st.write(row_data["explanation"])
 
-    # Summary
-    if row_data.get("summary"):
-        st.subheader("📋 Summary")
-        summary_list = (
-            row_data["summary"]
-            if isinstance(row_data["summary"], list)
-            else [row_data["summary"]]
-        )
-        for item in summary_list:
-            st.write(f"• {item}")
+    # Display list sections using reusable helper function with enhanced styling
+    st.markdown("---")
+    st.subheader("🔍 Detailed Analysis")
 
-    # Links Found
-    if row_data.get("links_found"):
-        st.subheader("🔗 Links Found")
-        links = (
-            row_data["links_found"]
-            if isinstance(row_data["links_found"], list)
-            else [row_data["links_found"]]
-        )
-        for link in links:
-            st.write(f"• {link}")
-
-    # Scam Patterns
-    if row_data.get("scam_patterns"):
-        st.subheader("🔍 Scam Patterns")
-        patterns = (
-            row_data["scam_patterns"]
-            if isinstance(row_data["scam_patterns"], list)
-            else [row_data["scam_patterns"]]
-        )
-        for pattern in patterns:
-            st.write(f"• {pattern}")
-
-    # Red Flags
-    if row_data.get("red_flags"):
-        st.subheader("🚩 Red Flags")
-        flags = (
-            row_data["red_flags"]
-            if isinstance(row_data["red_flags"], list)
-            else [row_data["red_flags"]]
-        )
-        for flag in flags:
-            st.write(f"• {flag}")
-
-    # Recommendations
-    if row_data.get("recommendations"):
-        st.subheader("💼 Recommendations")
-        recommendations = (
-            row_data["recommendations"]
-            if isinstance(row_data["recommendations"], list)
-            else [row_data["recommendations"]]
-        )
-        for rec in recommendations:
-            st.write(f"• {rec}")
+    display_list_section(row_data, "summary", "Summary", "📋", "summary")
+    display_list_section(row_data, "links_found", "Links Found", "🔗", "links")
+    display_list_section(row_data, "scam_patterns", "Scam Patterns", "🔍", "patterns")
+    display_list_section(row_data, "red_flags", "Red Flags", "🚩", "red-flags")
+    display_list_section(
+        row_data, "recommendations", "Recommendations", "💼", "recommendations"
+    )
 
     # URLs
     if row_data.get("page_profile_uri"):
@@ -494,22 +622,29 @@ if data:
 
     # Global date parsing (ensure consistent dtype for sorting/filtering)
     if "date_scraped" in df.columns:
-        df["date_scraped"] = pd.to_datetime(df["date_scraped"], errors="coerce", utc=True)
+        df["date_scraped"] = pd.to_datetime(
+            df["date_scraped"], errors="coerce", utc=True
+        )
 
     # Ensure ID column is string type to avoid Arrow serialization issues
     if "id" in df.columns:
         df["id"] = df["id"].astype(str)
-    
+
     # Convert numeric columns to proper types, handling errors
     if "page_like_count" in df.columns:
-        df["page_like_count"] = pd.to_numeric(df["page_like_count"], errors='coerce').fillna(0).astype(int)
-    
-    if "report_count" in df.columns:
-        df["report_count"] = pd.to_numeric(df["report_count"], errors='coerce').fillna(0).astype(int)
-    
-    if "reported" in df.columns:
-        df["reported"] = pd.to_numeric(df["reported"], errors='coerce').fillna(0).astype(int)
+        df["page_like_count"] = (
+            pd.to_numeric(df["page_like_count"], errors="coerce").fillna(0).astype(int)
+        )
 
+    if "report_count" in df.columns:
+        df["report_count"] = (
+            pd.to_numeric(df["report_count"], errors="coerce").fillna(0).astype(int)
+        )
+
+    if "reported" in df.columns:
+        df["reported"] = (
+            pd.to_numeric(df["reported"], errors="coerce").fillna(0).astype(int)
+        )
 
     # Apply filters
     scam_filter = st.session_state.get("scam_filter")
@@ -524,11 +659,19 @@ if data:
             full_threat_cat = st.session_state["_threat_category_series"]
             # Rebuild on current df index (some rows may have been filtered by scam filter)
             tl_upper = df["threat_level"].astype(str).str.upper().str.strip()
-            other_mask = (~tl_upper.isin(["HIGH", "MEDIUM", "LOW"])) | df["threat_level"].isna() | (tl_upper == "")
+            other_mask = (
+                (~tl_upper.isin(["HIGH", "MEDIUM", "LOW"]))
+                | df["threat_level"].isna()
+                | (tl_upper == "")
+            )
             threat_category = tl_upper.where(~other_mask, "OTHER")
         else:
             tl_upper = df["threat_level"].astype(str).str.upper().str.strip()
-            other_mask = (~tl_upper.isin(["HIGH", "MEDIUM", "LOW"])) | df["threat_level"].isna() | (tl_upper == "")
+            other_mask = (
+                (~tl_upper.isin(["HIGH", "MEDIUM", "LOW"]))
+                | df["threat_level"].isna()
+                | (tl_upper == "")
+            )
             threat_category = tl_upper.where(~other_mask, "OTHER")
         df = df[threat_category.isin(threat_filter)]
 
@@ -552,8 +695,12 @@ if data:
             include_missing_dates = st.session_state.get("include_missing_dates", True)
             ds = pd.to_datetime(df["date_scraped"], errors="coerce", utc=True)
             tzinfo = ds.dt.tz
-            start_ts = pd.Timestamp(datetime.datetime.combine(start_date, datetime.time.min))
-            end_ts = pd.Timestamp(datetime.datetime.combine(end_date, datetime.time.max))
+            start_ts = pd.Timestamp(
+                datetime.datetime.combine(start_date, datetime.time.min)
+            )
+            end_ts = pd.Timestamp(
+                datetime.datetime.combine(end_date, datetime.time.max)
+            )
             if tzinfo is not None:
                 start_ts = start_ts.tz_localize(tzinfo)
                 end_ts = end_ts.tz_localize(tzinfo)
@@ -583,9 +730,7 @@ if data:
         st.metric("⚠️ High Threat", high_threat)
 
     with col5:
-        reported_count = (
-            len(df[df["reported"] == 1]) if "reported" in df.columns else 0
-        )
+        reported_count = len(df[df["reported"] == 1]) if "reported" in df.columns else 0
         st.metric("📮 Reported", reported_count)
 
     # Filter summary badge (situational awareness for investigators)
@@ -631,9 +776,7 @@ if data:
             # Threat level distribution
             if "threat_level" in df.columns:
                 # Normalize and bucket threat levels: only HIGH, MEDIUM, LOW retained; others -> OTHER
-                normalized = (
-                    df["threat_level"].fillna("OTHER").astype(str).str.upper()
-                )
+                normalized = df["threat_level"].fillna("OTHER").astype(str).str.upper()
                 normalized = normalized.where(
                     normalized.isin(["HIGH", "MEDIUM", "LOW"]), "OTHER"
                 )
@@ -658,7 +801,9 @@ if data:
                         "OTHER": "#6c757d",
                     },
                 )
-                fig_bar.update_layout(yaxis_title="Ads Count", xaxis_title="Threat Level")
+                fig_bar.update_layout(
+                    yaxis_title="Ads Count", xaxis_title="Threat Level"
+                )
                 st.plotly_chart(fig_bar, use_container_width=True)
 
         # Supplementary analytics for deeper investigative context
@@ -677,13 +822,18 @@ if data:
                         markers=True,
                         title="Daily Ads Ingested",
                     )
-                    fig_daily.update_layout(xaxis_title="Date", yaxis_title="Count of Ads")
+                    fig_daily.update_layout(
+                        xaxis_title="Date", yaxis_title="Count of Ads"
+                    )
                     st.plotly_chart(fig_daily, use_container_width=True)
 
             # Top pages by scam ad frequency
             if "page_name" in df.columns and "is_scam" in df.columns:
                 top_pages = (
-                    df[df["is_scam"] == True]["page_name"].value_counts().head(10).reset_index()
+                    df[df["is_scam"] == True]["page_name"]
+                    .value_counts()
+                    .head(10)
+                    .reset_index()
                 )
                 if not top_pages.empty:
                     top_pages.columns = ["Page", "Scam Ads"]
@@ -700,12 +850,20 @@ if data:
                     st.plotly_chart(fig_top_pages, use_container_width=True)
 
             # Threat level trend (stacked area)
-            if "threat_level" in df.columns and "date_scraped" in df.columns and df["date_scraped"].notna().any():
+            if (
+                "threat_level" in df.columns
+                and "date_scraped" in df.columns
+                and df["date_scraped"].notna().any()
+            ):
                 tl_norm = df["threat_level"].fillna("OTHER").astype(str).str.upper()
-                tl_norm = tl_norm.where(tl_norm.isin(["HIGH", "MEDIUM", "LOW"]), "OTHER")
+                tl_norm = tl_norm.where(
+                    tl_norm.isin(["HIGH", "MEDIUM", "LOW"]), "OTHER"
+                )
                 tl_trend = (
                     df.assign(_tl=tl_norm, _date=df["date_scraped"].dt.date)
-                    .groupby(["_date", "_tl"]).size().reset_index(name="count")
+                    .groupby(["_date", "_tl"])
+                    .size()
+                    .reset_index(name="count")
                 )
                 if not tl_trend.empty:
                     fig_area = px.area(
@@ -722,10 +880,16 @@ if data:
                             "OTHER": "#6c757d",
                         },
                     )
-                    fig_area.update_layout(xaxis_title="Date", yaxis_title="Ads Count", legend_title="Threat Level")
+                    fig_area.update_layout(
+                        xaxis_title="Date",
+                        yaxis_title="Ads Count",
+                        legend_title="Threat Level",
+                    )
                     st.plotly_chart(fig_area, use_container_width=True)
 
-            st.caption("These charts support pattern recognition: volume spikes, prolific sources, and escalation trends help prioritization.")
+            st.caption(
+                "These charts support pattern recognition: volume spikes, prolific sources, and escalation trends help prioritization."
+            )
 
     # Main data table with pagination
     st.header("📋 Ads Overview")
@@ -760,7 +924,9 @@ if data:
         if "threat_level" in display_df.columns:
             tl_disp = display_df["threat_level"].astype(str).str.upper().str.strip()
             base_levels = {"HIGH", "MEDIUM", "LOW"}
-            display_df["threat_level"] = tl_disp.where(tl_disp.isin(base_levels), "OTHER")
+            display_df["threat_level"] = tl_disp.where(
+                tl_disp.isin(base_levels), "OTHER"
+            )
 
         # Format the display
         if "is_scam" in display_df.columns:
@@ -783,11 +949,23 @@ if data:
         # --- Server-side Sorting Controls (applied BEFORE pagination) ---
         with st.container():
             sort_cols_available = [c for c in display_df.columns if c not in []]
+            default_sort_col = (
+                "date_scraped"
+                if "date_scraped" in sort_cols_available
+                else sort_cols_available[0]
+            )
             sort_col = st.selectbox(
-                "Sort by column (server-side)", sort_cols_available, key="sort_primary"
+                "Sort by column (server-side)",
+                sort_cols_available,
+                index=sort_cols_available.index(default_sort_col),
+                key="sort_column_select",
             )
             sort_dir = st.radio(
-                "Order", ["Ascending", "Descending"], horizontal=True, key="sort_dir"
+                "Order",
+                ["Ascending", "Descending"],
+                index=1,
+                horizontal=True,
+                key="sort_direction_select",
             )
 
             # (Optional) secondary sort can be added later; for now single column
@@ -810,7 +988,9 @@ if data:
                 numeric_ratio = numeric_try.notna().mean()
                 if numeric_ratio >= 0.8:  # majority numeric
                     # Fill NaNs with extreme sentinel so they sort last/first
-                    fill_value = numeric_try.max() + 1 if ascending else numeric_try.min() - 1
+                    fill_value = (
+                        numeric_try.max() + 1 if ascending else numeric_try.min() - 1
+                    )
                     sort_key = numeric_try.fillna(fill_value)
                 else:
                     sort_key = col_series.astype(str)
@@ -843,7 +1023,9 @@ if data:
                 "threat_level": st.column_config.TextColumn("Threat Level"),
                 "page_like_count": st.column_config.NumberColumn("Page Likes"),
                 "report_count": st.column_config.NumberColumn("Reports"),
-                "Reported": st.column_config.TextColumn("Reported"),  # Configure reported column
+                "Reported": st.column_config.TextColumn(
+                    "Reported"
+                ),  # Configure reported column
             },
         )
 
@@ -853,13 +1035,29 @@ if data:
         # Handle row selection
         if event.selection.rows:
             selected_row_index = event.selection.rows[0]
-            # Calculate the actual index in the original dataframe
-            actual_index = (current_page - 1) * rows_per_page + selected_row_index
-            selected_row_data = df.iloc[actual_index].to_dict()
-            st.session_state.selected_row_id = selected_row_data.get("id")
+            # Get the selected row from the paginated dataframe
+            selected_paginated_row = paginated_df.iloc[selected_row_index]
 
-            # Show detailed view immediately
-            show_detailed_view(selected_row_data)
+            # Get the ID from the selected row
+            selected_id = (
+                selected_paginated_row.get("id")
+                if "id" in selected_paginated_row
+                else None
+            )
+
+            if selected_id:
+                # Find the corresponding row in the original df using the ID
+                matching_row = df[df["id"] == selected_id]
+                if not matching_row.empty:
+                    selected_row_data = matching_row.iloc[0].to_dict()
+                    st.session_state.selected_row_id = selected_id
+
+                    # Show detailed view immediately
+                    show_detailed_view(selected_row_data)
+                else:
+                    st.error(f"Could not find data for selected ID: {selected_id}")
+            else:
+                st.error("Selected row does not have an ID")
         else:
             st.markdown(
                 """
