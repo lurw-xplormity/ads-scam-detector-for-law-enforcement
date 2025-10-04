@@ -483,19 +483,38 @@ def show_detailed_view(row_data):
     st.header("📋 Detailed View")
 
     # Add Report to Police button at the top
-    col1, col2 = st.columns([1, 1])
+    col1, col2, col3 = st.columns([3, 1, 1])
     with col1:
         st.write(f"**Selected ID:** {row_data.get('id', 'N/A')}")
 
     with col2:
+        if row_data.get("is_scam") == 0:
+            st.markdown(
+                '<span class="legit-badge">✓ LEGIT</span>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<span class="scam-badge">⚠️ SCAM</span>',
+                unsafe_allow_html=True,
+            )
+
+    with col3:
         if row_data.get("reported") == 1:
             st.markdown(
                 '<span class="legit-badge">✓ Already Reported</span>',
                 unsafe_allow_html=True,
             )
+        # elif row_data.get("is_scam") == 0:
+        #     st.markdown(
+        #         '<span class="legit-badge">✓ LEGIT</span>',
+        #         unsafe_allow_html=True,
+        #     )
         else:
             if st.button("🚨 Report to Police", type="primary", key="report_button"):
                 report_to_police(row_data.get("id"))
+
+
 
     # Basic Information
     col1, col2 = st.columns(2)
@@ -902,6 +921,7 @@ if data:
 
     # Select important columns for the main table
     important_columns = [
+        "ad_url",
         "id",
         "page_name",
         "is_scam",
@@ -920,6 +940,19 @@ if data:
         # Create display dataframe
         display_df = df[display_columns].copy()
 
+        # Put the ad_url in a link format (HTML inside a table cell)
+        # if "ad_url" in display_df.columns:
+        #     display_df["ad_url"] = display_df["ad_url"].apply(
+        #         lambda x: f'<a href="{x}" target="_blank">Link</a>' if pd.notna(x) else ""
+        #     )
+
+        if "threat_level" in display_df.columns:
+            tl_disp = display_df["threat_level"].astype(str).str.upper().str.strip()
+            base_levels = {"HIGH", "MEDIUM", "LOW"}
+            display_df["threat_level"] = tl_disp.where(
+                tl_disp.isin(base_levels), "OTHER"
+            )
+
         # Normalize threat level for display consistency
         if "threat_level" in display_df.columns:
             tl_disp = display_df["threat_level"].astype(str).str.upper().str.strip()
@@ -937,8 +970,9 @@ if data:
 
         # Format reported column with tick/cross
         if "reported" in display_df.columns:
-            display_df["Reported"] = display_df["reported"].apply(
-                lambda x: "✅" if x == 1 else "❌"
+            display_df["Reported"] = display_df.apply(
+                lambda row: "✅" if row["reported"] == 1 else ("❌" if ("Status" in display_df.columns and row["Status"] != "LEGIT") else "-"),
+                axis=1
             )
             display_df = display_df.drop("reported", axis=1)
 
@@ -1023,9 +1057,8 @@ if data:
                 "threat_level": st.column_config.TextColumn("Threat Level"),
                 "page_like_count": st.column_config.NumberColumn("Page Likes"),
                 "report_count": st.column_config.NumberColumn("Reports"),
-                "Reported": st.column_config.TextColumn(
-                    "Reported"
-                ),  # Configure reported column
+                "Reported": st.column_config.TextColumn("Reported"),
+                "ad_url": st.column_config.LinkColumn("Ad URL", display_text="View Ad"),
             },
         )
 
