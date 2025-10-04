@@ -389,25 +389,15 @@ with st.sidebar:
     if st.session_state.data and len(st.session_state.data) > 0:
         df = pd.DataFrame(st.session_state.data)
 
-        # Scam filter - preserve state
-        default_scam_filter = st.session_state.get("scam_filter", "All")
+        # Scam filter
         scam_filter_options = ["All", "Scam Only", "Legit Only"]
-        default_index = (
-            scam_filter_options.index(default_scam_filter)
-            if default_scam_filter in scam_filter_options
-            else 0
-        )
 
-        scam_widget_key = f"_scam_filter_widget_{st.session_state.filter_reset_counter}"
         scam_filter = st.radio(
             "Scam Status",
             scam_filter_options,
-            index=default_index,
-            key=scam_widget_key,
-        )
-        st.session_state["scam_filter"] = scam_filter
-
-        # (Temporarily defer threat level filter until after date filtering)
+            index=0,  # Default to "All"
+            key=f"scam_filter_{st.session_state.filter_reset_counter}",  # Dynamic key for reset
+        )  # (Temporarily defer threat level filter until after date filtering)
         deferred_threat_needed = "threat_level" in df.columns
         threat_filter = []  # will be built after date capture (no data mutation here)
 
@@ -422,63 +412,31 @@ with st.sidebar:
 
             if parsed_dates_preview.notna().any():
                 with st.expander("📅 Date Range", expanded=False):
-                    checkbox_key = f"_include_missing_dates_widget_{st.session_state.filter_reset_counter}"
+                    checkbox_key = (
+                        f"include_missing_dates_{st.session_state.filter_reset_counter}"
+                    )
                     include_missing_dates = st.checkbox(
                         "Include missing dates",
-                        value=st.session_state.get("include_missing_dates", True),
+                        value=True,  # Default to True
                         help="Include ads without valid dates",
                         key=checkbox_key,
                     )
-                    st.session_state["include_missing_dates"] = include_missing_dates
 
                     min_dt = parsed_dates_preview.min().date()
                     max_dt = parsed_dates_preview.max().date()
 
                     # Use dynamic key that changes when filters are reset
                     date_widget_key = (
-                        f"_date_range_widget_{st.session_state.filter_reset_counter}"
+                        f"date_range_{st.session_state.filter_reset_counter}"
                     )
-
-                    # Check if date_range should be reset or use previous selection
-                    prev_range = st.session_state.get("date_range")
-                    default_range = (min_dt, max_dt)
-
-                    # Only use previous range if it exists and is valid
-                    if (
-                        prev_range
-                        and isinstance(prev_range, tuple)
-                        and len(prev_range) == 2
-                    ):
-                        try:
-                            if (
-                                min_dt <= prev_range[0] <= max_dt
-                                and min_dt <= prev_range[1] <= max_dt
-                            ):
-                                default_range = prev_range
-                        except Exception:
-                            pass
 
                     date_range = st.date_input(
                         "Select Range",
-                        value=default_range,
+                        value=(min_dt, max_dt),  # Default to full range
                         min_value=min_dt,
                         max_value=max_dt,
                         key=date_widget_key,
                     )
-
-                    # Only update session state if the range is not the full range
-                    if (
-                        date_range
-                        and isinstance(date_range, tuple)
-                        and len(date_range) == 2
-                    ):
-                        if date_range != (min_dt, max_dt):
-                            st.session_state["date_range"] = date_range
-                        else:
-                            # Full range means no filter
-                            st.session_state["date_range"] = None
-                    elif date_range:
-                        st.session_state["date_range"] = date_range
 
     # Threat level filter now (after date filtering so counts reflect visible data)
     if deferred_threat_needed:
@@ -498,17 +456,14 @@ with st.sidebar:
         default_opts = prev_tf if prev_tf else options
 
         with st.expander("⚠️ Threat Levels", expanded=True):
-            threat_widget_key = (
-                f"_threat_filter_widget_{st.session_state.filter_reset_counter}"
-            )
+            threat_widget_key = f"threat_filter_{st.session_state.filter_reset_counter}"
             threat_filter = st.multiselect(
                 "Select levels",
                 options,
-                default=default_opts,
+                default=options,  # Default to all options
                 help="OTHER: non-standard values",
                 key=threat_widget_key,
             )
-            st.session_state["threat_filter"] = threat_filter
 
             # Show counts compactly
             counts = threat_category_preview.value_counts(dropna=False)
@@ -524,15 +479,8 @@ with st.sidebar:
 
     # Add clear filters button
     if st.button("🔄 Clear All Filters", use_container_width=True):
-        # Reset all filter states
-        st.session_state["scam_filter"] = "All"
-        st.session_state["threat_filter"] = None
-        st.session_state["date_range"] = None
-        st.session_state["include_missing_dates"] = True
-
-        # Increment the counter to force widget recreation with new keys
+        # Increment the counter to force widget recreation with default values
         st.session_state.filter_reset_counter += 1
-
         st.rerun()
 
 # Main content
@@ -840,8 +788,9 @@ if data:
             pd.to_numeric(df["reported"], errors="coerce").fillna(0).astype(int)
         )
 
-    # Apply filters
-    scam_filter = st.session_state.get("scam_filter", "All")
+    # Apply filters - read from widget keys
+    scam_filter_key = f"scam_filter_{st.session_state.filter_reset_counter}"
+    scam_filter = st.session_state.get(scam_filter_key, "All")
     if scam_filter == "Scam Only" and "is_scam" in df.columns:
         # Handle both boolean and numeric values
         df = df[(df["is_scam"] == True) | (df["is_scam"] == 1)]
@@ -849,14 +798,15 @@ if data:
         # Handle both boolean and numeric values
         df = df[(df["is_scam"] == False) | (df["is_scam"] == 0)]
 
-    threat_filter = st.session_state.get("threat_filter", [])
+    threat_filter_key = f"threat_filter_{st.session_state.filter_reset_counter}"
+    threat_filter = st.session_state.get(threat_filter_key, [])
     if threat_filter and "_threat_normalized" in df.columns:
         df = df[df["_threat_normalized"].isin(threat_filter)]
 
-    # Apply date range filter (single application here) using session state.
-    # Handle transitional single-date selection gracefully.
-    if "date_range" in st.session_state and "date_scraped" in df.columns:
-        raw_range = st.session_state["date_range"]
+    # Apply date range filter
+    date_range_key = f"date_range_{st.session_state.filter_reset_counter}"
+    if date_range_key in st.session_state and "date_scraped" in df.columns:
+        raw_range = st.session_state[date_range_key]
         start_date = end_date = None
         # Normalize raw_range from possible types: date, (date,), (start,end)
         if isinstance(raw_range, (list, tuple)):
@@ -870,7 +820,12 @@ if data:
         if start_date is not None and end_date is not None:
             if end_date < start_date:
                 start_date, end_date = end_date, start_date
-            include_missing_dates = st.session_state.get("include_missing_dates", True)
+
+            include_missing_key = (
+                f"include_missing_dates_{st.session_state.filter_reset_counter}"
+            )
+            include_missing_dates = st.session_state.get(include_missing_key, True)
+
             ds = pd.to_datetime(df["date_scraped"], errors="coerce", utc=True)
             tzinfo = ds.dt.tz
             start_ts = pd.Timestamp(
@@ -935,15 +890,19 @@ if data:
 
     # Filter summary badge (compact version)
     active_filters = []
-    scam_filter_state = st.session_state.get("scam_filter")
+    scam_filter_key = f"scam_filter_{st.session_state.filter_reset_counter}"
+    scam_filter_state = st.session_state.get(scam_filter_key)
     if scam_filter_state and scam_filter_state != "All":
         active_filters.append(scam_filter_state.replace(" Only", ""))
-    tfilt = st.session_state.get("threat_filter")
+
+    threat_filter_key = f"threat_filter_{st.session_state.filter_reset_counter}"
+    tfilt = st.session_state.get(threat_filter_key)
     if tfilt and len(tfilt) < 4:  # Only show if filtered
         active_filters.append("Threat: " + ",".join(tfilt))
 
     # Only show date filter if it's actually set and not the full range
-    date_range_val = st.session_state.get("date_range")
+    date_range_key = f"date_range_{st.session_state.filter_reset_counter}"
+    date_range_val = st.session_state.get(date_range_key)
     if date_range_val is not None:
         active_filters.append("Date Filtered")
 
@@ -1105,6 +1064,30 @@ if data:
 
     # Main data table with pagination
     st.subheader("📋 Ads Data Table")
+
+    # Export button for filtered data
+    if len(df) > 0:
+        # Create a copy of the dataframe for export
+        export_df = df.copy()
+
+        # Drop internal columns used for filtering
+        cols_to_drop = ["_threat_normalized"]
+        export_df = export_df.drop(
+            columns=[col for col in cols_to_drop if col in export_df.columns]
+        )
+
+        # Convert to CSV
+        csv = export_df.to_csv(index=False).encode("utf-8")
+
+        # Create download button
+        st.download_button(
+            label="📥 Export Filtered Data as CSV",
+            data=csv,
+            file_name=f'scam_ads_filtered_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.csv',
+            mime="text/csv",
+            help=f"Download {len(df)} filtered rows as CSV",
+            use_container_width=True,
+        )
 
     # Instruction badge prompting selection
     st.info("👆 **Tip:** Click any row to view detailed analysis below")
