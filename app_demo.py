@@ -6,792 +6,1231 @@ import plotly.express as px
 import plotly.graph_objects as go
 import math
 import datetime
-from datetime import timedelta
-import logging
-from typing import Optional, Dict, List, Any
-import json
 
 from dotenv import load_dotenv
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
-# Configuration with validation
 MAIN_URL = os.getenv("MAIN_URL")
 MAIL_URL = os.getenv("MAIL_URL")
 
-# Validate environment variables
-if not MAIN_URL or not MAIL_URL:
-    st.error("❌ Environment variables MAIN_URL and MAIL_URL must be configured")
-    st.stop()
-
 # Page configuration
 st.set_page_config(
-    page_title="Cybercrime Detection Dashboard",
+    page_title="Scam Detection Dashboard",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': None,
-        'Report a bug': None,
-        'About': "Cybercrime Detection Dashboard v2.0"
-    }
 )
 
-# Professional Streamlit styling
-st.markdown("""
+# Custom CSS for better styling and responsiveness
+st.markdown(
+    """
 <style>
-    /* Main app background */
-    .stApp {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     }
     
-    /* Header styling */
+    /* Responsive sidebar */
+    [data-testid="stSidebar"] {
+        min-width: 250px;
+        max-width: 350px;
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        padding: 0.5rem 0;
+    }
+    
+    /* Main content responsive */
+    .main .block-container {
+        max-width: 100%;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    
     .main-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 15px;
-        color: white;
+        font-size: clamp(1.5rem, 4vw, 2.5rem);
+        font-weight: bold;
+        color: #1f77b4;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        padding-bottom: 1rem;
     }
-    
-    /* Sidebar enhancements */
-    .css-1d391kg {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(10px);
-    }
-    
-    /* Metric cards */
-    div[data-testid="metric-container"] {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+    .metric-card {
+        background-color: #f0f2f6;
         padding: 1rem;
         border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-left: 5px solid #1f77b4;
     }
     
-    /* Dataframe styling */
-    .stDataFrame {
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
-    
-    /* Button enhancements */
-    .stButton > button {
+    /* Responsive metrics */
+    [data-testid="stMetric"] {
+        # background-color: #f8f9fa;
+        padding: 1rem;
         border-radius: 8px;
+        border: 1px solid #e9ecef;
+        height: 150px;
+    }
+    
+    .scam-badge {
+        background-color: #ff4b4b;
+        color: white;
+        padding: 0.3rem 0.6rem;
+        border-radius: 15px;
+        font-size: clamp(0.7rem, 2vw, 0.85rem);
+        font-weight: bold;
+        display: inline-block;
+    }
+    .legit-badge {
+        background-color: #00cc88;
+        color: white;
+        padding: 0.3rem 0.6rem;
+        border-radius: 15px;
+        font-size: clamp(0.7rem, 2vw, 0.85rem);
+        font-weight: bold;
+        display: inline-block;
+    }
+    .threat-high {
+        background-color: #ff4b4b;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 10px;
+        font-weight: bold;
+    }
+    .threat-medium {
+        background-color: #ffa500;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 10px;
+        font-weight: bold;
+    }
+    .threat-low {
+        background-color: #00cc88;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 10px;
+        font-weight: bold;
+    }
+    .report-button {
+        background-color: #dc3545;
+        color: white;
         border: none;
-        transition: all 0.3s ease;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .instruction-badge {
+        display: inline-block;
+        background: linear-gradient(90deg,#1f77b4,#4fa3e3);
+        color: #fff;
+        padding: 0.5rem 1rem;
+        border-radius: 25px;
         font-weight: 600;
+        letter-spacing: .5px;
+        font-size: clamp(0.75rem, 2vw, 0.9rem);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .placeholder-panel {
+        background: linear-gradient(135deg, rgba(31, 119, 180, 0.1), rgba(79, 163, 227, 0.1));
+        border: 2px dashed #1f77b4;
+        padding: 2rem 1.5rem;
+        border-radius: 12px;
+        font-size: clamp(0.85rem, 2vw, 1rem);
+        line-height: 1.6;
+        text-align: center;
+        margin: 1.5rem 0;
+    }
+    
+    /* Responsive dataframe */
+    [data-testid="stDataFrame"] {
+        width: 100%;
+    }
+    
+    /* Button improvements */
+    .stButton > button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .info-section {
+        background-color: rgba(31, 119, 180, 0.08);
+        border-left: 4px solid #1f77b4;
+        padding: 1.25rem;
+        margin: 1rem 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    /* Success/Error/Warning boxes */
-    .stSuccess, .stError, .stWarning, .stInfo {
-        border-radius: 10px;
-        border-left: 5px solid;
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        [data-testid="stSidebar"] {
+            min-width: 100%;
+        }
+        
+        .info-section {
+            padding: 0.75rem;
+        }
+        
+        .section-title {
+            font-size: 1rem;
+        }
+        
+        .stButton > button {
+            font-size: 0.85rem;
+            padding: 0.5rem;
+        }
     }
-    
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stDeployButton {display: none;}
-    
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
+    .info-section.summary {
+        border-left-color: #17a2b8;
+        background-color: rgba(23, 162, 184, 0.08);
     }
-    ::-webkit-scrollbar-track {
-        background: rgba(255,255,255,0.1);
-        border-radius: 4px;
+    .info-section.links {
+        border-left-color: #6610f2;
+        background-color: rgba(102, 16, 242, 0.08);
     }
-    ::-webkit-scrollbar-thumb {
-        background: rgba(255,255,255,0.3);
-        border-radius: 4px;
+    .info-section.patterns {
+        border-left-color: #fd7e14;
+        background-color: rgba(253, 126, 20, 0.08);
     }
-    ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255,255,255,0.5);
+    .info-section.red-flags {
+        border-left-color: #dc3545;
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .info-section.recommendations {
+        border-left-color: #28a745;
+        background-color: rgba(40, 167, 69, 0.08);
+    }
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        opacity: 0.95;
+    }
+    .info-item {
+        padding: 0.5rem 0;
+        margin-left: 1rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        opacity: 0.9;
+    }
+    .info-item::before {
+        content: "•";
+        color: #1f77b4;
+        font-weight: bold;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+    .info-section.summary .info-item::before {
+        color: #17a2b8;
+    }
+    .info-section.links .info-item::before {
+        color: #8b5cf6;
+    }
+    .info-section.patterns .info-item::before {
+        color: #fd7e14;
+    }
+    .info-section.red-flags .info-item::before {
+        color: #ff6b6b;
+    }
+    .info-section.recommendations .info-item::before {
+        color: #51cf66;
+    }
+    .info-item a {
+        color: #4dabf7;
+        text-decoration: none;
+        word-break: break-all;
+    }
+    .info-item a:hover {
+        text-decoration: underline;
+        color: #74c0fc;
+    }
+    .empty-section {
+        font-style: italic;
+        padding: 0.5rem 0;
+        opacity: 0.7;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# Constants
-DEFAULT_ROWS_PER_PAGE = 25
-MAX_RETRIES = 3
-REQUEST_TIMEOUT = 15
+# Initialize session state
+if "data" not in st.session_state:
+    st.session_state.data = None
+if "selected_row_id" not in st.session_state:
+    st.session_state.selected_row_id = None
+if "current_page" not in st.session_state:
+    st.session_state.current_page = 1
+if "rows_per_page" not in st.session_state:
+    st.session_state.rows_per_page = 20
+if "data_loading" not in st.session_state:
+    st.session_state.data_loading = False
+if "data_loaded" not in st.session_state:
+    st.session_state.data_loaded = False
+if "filter_reset_counter" not in st.session_state:
+    st.session_state.filter_reset_counter = 0
 
-# Initialize session state with proper defaults
-def initialize_session_state():
-    """Initialize session state variables with proper defaults"""
-    defaults = {
-        "data": None,
-        "selected_row_id": None,
-        "current_page": 1,
-        "rows_per_page": DEFAULT_ROWS_PER_PAGE,
-        "last_refresh": None,
-        "view_mode": "overview",
-        "scam_filter": "All",
-        "threat_filter": [],
-        "date_range": None,
-        "include_missing_dates": True,
-        "loading": False,
-        "error_message": None
-    }
-    
-    for key, default_value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = default_value
 
-# Data loading with robust error handling
-@st.cache_data(ttl=300, show_spinner=False)
-def load_data_from_api() -> tuple[List[Dict], Optional[str]]:
-    """Load data from API with comprehensive error handling"""
-    try:
-        logger.info(f"Attempting to fetch data from {MAIN_URL}")
-        response = requests.get(MAIN_URL, timeout=REQUEST_TIMEOUT)
-        
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                if isinstance(data, dict) and "data" in data:
-                    records = data["data"]
-                    if isinstance(records, list):
-                        logger.info(f"Successfully loaded {len(records)} records")
-                        return records, None
-                    else:
-                        return [], "Invalid data format: 'data' field is not a list"
+# --- Data Loading Helper (moved up so sidebar can use data on first render) ---
+def load_initial_data():
+    """Load data on app start (idempotent with better error handling)."""
+    if st.session_state.data is None and not st.session_state.data_loading:
+        st.session_state.data_loading = True
+        try:
+            with st.spinner("Loading data from server..."):
+                response = requests.get(MAIN_URL, timeout=10)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    data_list = res_data.get("data", [])
+                    st.session_state.data = data_list
+                    st.session_state.data_loaded = True
+                    if len(data_list) == 0:
+                        st.warning("⚠️ No data available in the database.")
                 else:
-                    return [], "Invalid response format: missing 'data' field"
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error: {e}")
-                return [], f"Invalid JSON response: {str(e)}"
-        else:
-            logger.error(f"HTTP error: {response.status_code}")
-            return [], f"Server error: HTTP {response.status_code}"
-            
-    except requests.exceptions.Timeout:
-        logger.error("Request timeout")
-        return [], "Request timeout - server may be overloaded"
-    except requests.exceptions.ConnectionError:
-        logger.error("Connection error")
-        return [], "Connection failed - check network connectivity"
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request exception: {e}")
-        return [], f"Network error: {str(e)}"
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return [], f"Unexpected error: {str(e)}"
+                    st.error(
+                        f"❌ Failed to load data. Status code: {response.status_code}"
+                    )
+                    st.session_state.data = []
+        except requests.exceptions.Timeout:
+            st.error("⏱️ Request timeout. Please check your connection and try again.")
+            st.session_state.data = []
+        except requests.exceptions.ConnectionError:
+            st.error("🔌 Connection error. Please check if the server is running.")
+            st.session_state.data = []
+        except Exception as e:
+            st.error(f"❌ Error loading data: {str(e)}")
+            st.session_state.data = []
+        finally:
+            st.session_state.data_loading = False
+    return st.session_state.data
 
-def safe_report_to_police(ad_id: str) -> tuple[bool, str]:
-    """Send report to police with comprehensive error handling"""
-    if not ad_id:
-        return False, "Invalid Case ID"
-    
+
+# Pre-load data BEFORE building sidebar so filters appear immediately
+load_initial_data()
+
+# Header
+st.markdown(
+    '<h1 class="main-header">🛡️ Scam Detection Dashboard</h1>', unsafe_allow_html=True
+)
+
+# Sidebar
+with st.sidebar:
+    st.header("🔧 Controls")
+
+    # Add info note about crawler schedule
+    st.info("📅 **Auto-refresh:** Crawler updates every 3 days")
+
+    # Refresh data button
+    if st.button("🔄 Refresh Data", type="primary", use_container_width=True):
+        with st.spinner("Fetching latest data..."):
+            try:
+                response = requests.get(MAIN_URL, timeout=10)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    st.session_state.data = res_data.get("data", [])
+                    st.session_state.current_page = 1  # Reset to first page
+                    st.session_state.data_loaded = True
+                    st.success("✅ Data refreshed!")
+                    st.rerun()
+                else:
+                    st.error(
+                        f"❌ Failed to fetch data (Status: {response.status_code})"
+                    )
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+
+    st.divider()
+
+    # Pagination settings
+    st.subheader("📄 Pagination")
+    rows_per_page = st.selectbox(
+        "Rows per page",
+        [10, 20, 50, 100],
+        index=1,  # Default to 20
+        key="rows_per_page_selector",
+    )
+    st.session_state.rows_per_page = rows_per_page
+
+    st.divider()
+
+    # Filters
+    st.subheader("🔍 Filters")
+
+    if st.session_state.data and len(st.session_state.data) > 0:
+        df = pd.DataFrame(st.session_state.data)
+
+        # Scam filter - preserve state
+        default_scam_filter = st.session_state.get("scam_filter", "All")
+        scam_filter_options = ["All", "Scam Only", "Legit Only"]
+        default_index = (
+            scam_filter_options.index(default_scam_filter)
+            if default_scam_filter in scam_filter_options
+            else 0
+        )
+
+        scam_widget_key = f"_scam_filter_widget_{st.session_state.filter_reset_counter}"
+        scam_filter = st.radio(
+            "Scam Status",
+            scam_filter_options,
+            index=default_index,
+            key=scam_widget_key,
+        )
+        st.session_state["scam_filter"] = scam_filter
+
+        # (Temporarily defer threat level filter until after date filtering)
+        deferred_threat_needed = "threat_level" in df.columns
+        threat_filter = []  # will be built after date capture (no data mutation here)
+
+        # Date range filter (with option to keep rows that have missing/invalid dates)
+        if "date_scraped" in df.columns:
+            parsed_dates_preview = pd.to_datetime(
+                df["date_scraped"],
+                errors="coerce",
+                infer_datetime_format=True,
+                utc=True,
+            )
+
+            if parsed_dates_preview.notna().any():
+                with st.expander("📅 Date Range", expanded=False):
+                    checkbox_key = f"_include_missing_dates_widget_{st.session_state.filter_reset_counter}"
+                    include_missing_dates = st.checkbox(
+                        "Include missing dates",
+                        value=st.session_state.get("include_missing_dates", True),
+                        help="Include ads without valid dates",
+                        key=checkbox_key,
+                    )
+                    st.session_state["include_missing_dates"] = include_missing_dates
+
+                    min_dt = parsed_dates_preview.min().date()
+                    max_dt = parsed_dates_preview.max().date()
+
+                    # Use dynamic key that changes when filters are reset
+                    date_widget_key = (
+                        f"_date_range_widget_{st.session_state.filter_reset_counter}"
+                    )
+
+                    # Check if date_range should be reset or use previous selection
+                    prev_range = st.session_state.get("date_range")
+                    default_range = (min_dt, max_dt)
+
+                    # Only use previous range if it exists and is valid
+                    if (
+                        prev_range
+                        and isinstance(prev_range, tuple)
+                        and len(prev_range) == 2
+                    ):
+                        try:
+                            if (
+                                min_dt <= prev_range[0] <= max_dt
+                                and min_dt <= prev_range[1] <= max_dt
+                            ):
+                                default_range = prev_range
+                        except Exception:
+                            pass
+
+                    date_range = st.date_input(
+                        "Select Range",
+                        value=default_range,
+                        min_value=min_dt,
+                        max_value=max_dt,
+                        key=date_widget_key,
+                    )
+
+                    # Only update session state if the range is not the full range
+                    if (
+                        date_range
+                        and isinstance(date_range, tuple)
+                        and len(date_range) == 2
+                    ):
+                        if date_range != (min_dt, max_dt):
+                            st.session_state["date_range"] = date_range
+                        else:
+                            # Full range means no filter
+                            st.session_state["date_range"] = None
+                    elif date_range:
+                        st.session_state["date_range"] = date_range
+
+    # Threat level filter now (after date filtering so counts reflect visible data)
+    if deferred_threat_needed:
+        base_levels = ["HIGH", "MEDIUM", "LOW"]
+        tl_raw_preview = df["threat_level"]
+        tl_upper_preview = tl_raw_preview.astype(str).str.upper().str.strip()
+        other_mask_preview = (
+            (~tl_upper_preview.isin(base_levels))
+            | tl_raw_preview.isna()
+            | (tl_upper_preview == "")
+        )
+        threat_category_preview = tl_upper_preview.where(~other_mask_preview, "OTHER")
+        options = [lvl for lvl in base_levels if (threat_category_preview == lvl).any()]
+        if (threat_category_preview == "OTHER").any():
+            options.append("OTHER")
+        prev_tf = st.session_state.get("threat_filter")
+        default_opts = prev_tf if prev_tf else options
+
+        with st.expander("⚠️ Threat Levels", expanded=True):
+            threat_widget_key = (
+                f"_threat_filter_widget_{st.session_state.filter_reset_counter}"
+            )
+            threat_filter = st.multiselect(
+                "Select levels",
+                options,
+                default=default_opts,
+                help="OTHER: non-standard values",
+                key=threat_widget_key,
+            )
+            st.session_state["threat_filter"] = threat_filter
+
+            # Show counts compactly
+            counts = threat_category_preview.value_counts(dropna=False)
+            for cat in ["HIGH", "MEDIUM", "LOW", "OTHER"]:
+                if cat in counts.index:
+                    st.caption(f"{cat}: {counts[cat]}")
+
+        st.session_state["_other_threat_values"] = (
+            sorted(set(tl_raw_preview[other_mask_preview].dropna().astype(str)))
+            if other_mask_preview.any()
+            else []
+        )
+
+    # Add clear filters button
+    if st.button("🔄 Clear All Filters", use_container_width=True):
+        # Reset all filter states
+        st.session_state["scam_filter"] = "All"
+        st.session_state["threat_filter"] = None
+        st.session_state["date_range"] = None
+        st.session_state["include_missing_dates"] = True
+
+        # Increment the counter to force widget recreation with new keys
+        st.session_state.filter_reset_counter += 1
+
+        st.rerun()
+
+# Main content
+
+
+def report_to_police(ad_id):
+    """Send report to police API"""
     try:
-        payload = {"id": str(ad_id)}
-        logger.info(f"Reporting case {ad_id} to law enforcement")
-        
+        payload = {"id": ad_id}
         response = requests.post(
             MAIL_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=REQUEST_TIMEOUT
         )
-        
+
         if response.status_code == 200:
-            # Update reported status in session state
+            st.success(f"✅ Successfully reported Ad ID: {ad_id} to police!")
+
+            # Update the reported field in session state
             if st.session_state.data:
                 for i, item in enumerate(st.session_state.data):
-                    if str(item.get("id", "")) == str(ad_id):
+                    if item.get("id") == ad_id:
                         st.session_state.data[i]["reported"] = 1
                         break
-            
-            logger.info(f"Successfully reported case {ad_id}")
-            return True, f"Case {ad_id} successfully reported to Law Enforcement"
+
+            # Force a rerun to refresh the UI
+            st.rerun()
         else:
-            logger.error(f"Report failed with status {response.status_code}")
-            return False, f"Server error: HTTP {response.status_code}"
-            
-    except requests.exceptions.Timeout:
-        logger.error(f"Timeout reporting case {ad_id}")
-        return False, "Report timeout - please try again"
-    except requests.exceptions.ConnectionError:
-        logger.error(f"Connection error reporting case {ad_id}")
-        return False, "Connection failed - check network connectivity"
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request exception reporting case {ad_id}: {e}")
-        return False, f"Network error: {str(e)}"
+            st.error(f"❌ Failed to report. Status code: {response.status_code}")
     except Exception as e:
-        logger.error(f"Unexpected error reporting case {ad_id}: {e}")
-        return False, f"Unexpected error: {str(e)}"
+        st.error(f"❌ Error reporting to police: {str(e)}")
 
-def safe_get_value(data: Dict, key: str, default: Any = None) -> Any:
-    """Safely get value from dictionary with proper type handling"""
+
+def display_list_section(row_data, field_key, title, icon, section_class=""):
+    """
+    Helper function to display a list section in the detailed view.
+    Handles both list and string values gracefully with enhanced styling.
+
+    Args:
+        row_data: The data dictionary
+        field_key: The key to look up in row_data
+        title: The section title to display
+        icon: The emoji icon for the section
+        section_class: CSS class for styling (summary, links, patterns, red-flags, recommendations)
+    """
+    import json
+
+    # Normalize to list
+    items = row_data.get(field_key)
+
+    if not items:
+        return
+
+    # try json parsing if it's a string
     try:
-        value = data.get(key, default)
-        if pd.isna(value) or value == "" or value is None:
-            return default
-        return value
+        if isinstance(items, str):
+            parsed = json.loads(items)
+            if isinstance(parsed, list):
+                items = parsed
     except Exception:
-        return default
+        pass
 
-def format_number(value: Any) -> str:
-    """Format numbers safely"""
-    try:
-        if pd.isna(value) or value is None:
-            return "0"
-        num = float(value)
-        if num >= 1000000:
-            return f"{num/1000000:.1f}M"
-        elif num >= 1000:
-            return f"{num/1000:.1f}K"
+    if not isinstance(items, list):
+        items = [items]
+
+    # Filter out empty items
+    items = [item for item in items if item]
+
+    if not items:
+        return
+
+    # Create the section HTML
+    items_html = ""
+    for item in items:
+        item_str = str(item).strip()
+        # Check if item is a URL for links section
+        if section_class == "links" and (
+            item_str.startswith("http://") or item_str.startswith("https://")
+        ):
+            items_html += f'<div class="info-item"><a href="{item_str}" target="_blank">{item_str}</a></div>'
         else:
-            return f"{int(num):,}"
-    except (ValueError, TypeError):
-        return "0"
+            items_html += f'<div class="info-item">{item_str}</div>'
 
-def safe_date_parse(date_str: Any) -> Optional[datetime.datetime]:
-    """Safely parse date strings"""
-    if pd.isna(date_str) or date_str is None or date_str == "":
-        return None
-    
-    try:
-        return pd.to_datetime(date_str, errors='coerce', utc=True)
-    except Exception:
-        return None
-
-# Data processing functions
-def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocess dataframe with robust error handling"""
-    try:
-        df_processed = df.copy()
-        
-        # Handle date columns
-        if "date_scraped" in df_processed.columns:
-            df_processed["date_scraped"] = df_processed["date_scraped"].apply(safe_date_parse)
-        
-        # Handle ID column
-        if "id" in df_processed.columns:
-            df_processed["id"] = df_processed["id"].astype(str)
-        
-        # Handle numeric columns
-        numeric_columns = ["page_like_count", "report_count", "reported"]
-        for col in numeric_columns:
-            if col in df_processed.columns:
-                df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0).astype(int)
-        
-        # Handle boolean columns
-        if "is_scam" in df_processed.columns:
-            df_processed["is_scam"] = df_processed["is_scam"].fillna(False).astype(bool)
-        
-        if "is_active" in df_processed.columns:
-            df_processed["is_active"] = df_processed["is_active"].fillna(False).astype(bool)
-        
-        return df_processed
-        
-    except Exception as e:
-        logger.error(f"Error preprocessing dataframe: {e}")
-        return df
-
-def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply filters to dataframe with error handling"""
-    try:
-        filtered_df = df.copy()
-        
-        # Apply scam filter
-        scam_filter = st.session_state.get("scam_filter", "All")
-        if scam_filter == "Scam Only" and "is_scam" in filtered_df.columns:
-            filtered_df = filtered_df[filtered_df["is_scam"] == True]
-        elif scam_filter == "Legit Only" and "is_scam" in filtered_df.columns:
-            filtered_df = filtered_df[filtered_df["is_scam"] == False]
-        
-        # Apply threat level filter
-        threat_filter = st.session_state.get("threat_filter", [])
-        if threat_filter and "threat_level" in filtered_df.columns:
-            tl_upper = filtered_df["threat_level"].astype(str).str.upper().str.strip()
-            other_mask = (~tl_upper.isin(["HIGH", "MEDIUM", "LOW"])) | filtered_df["threat_level"].isna() | (tl_upper == "")
-            threat_category = tl_upper.where(~other_mask, "OTHER")
-            filtered_df = filtered_df[threat_category.isin(threat_filter)]
-        
-        # Apply date range filter
-        if "date_range" in st.session_state and "date_scraped" in filtered_df.columns:
-            date_range = st.session_state.get("date_range")
-            if date_range:
-                try:
-                    if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-                        start_date, end_date = date_range
-                        if start_date and end_date:
-                            if end_date < start_date:
-                                start_date, end_date = end_date, start_date
-                            
-                            include_missing = st.session_state.get("include_missing_dates", True)
-                            ds = pd.to_datetime(filtered_df["date_scraped"], errors="coerce", utc=True)
-                            
-                            start_ts = pd.Timestamp(datetime.datetime.combine(start_date, datetime.time.min))
-                            end_ts = pd.Timestamp(datetime.datetime.combine(end_date, datetime.time.max))
-                            
-                            # Handle timezone
-                            if ds.dt.tz is not None:
-                                start_ts = start_ts.tz_localize(ds.dt.tz.zone)
-                                end_ts = end_ts.tz_localize(ds.dt.tz.zone)
-                            
-                            date_mask = (ds >= start_ts) & (ds <= end_ts)
-                            if include_missing:
-                                date_mask = date_mask | ds.isna()
-                            
-                            filtered_df = filtered_df[date_mask]
-                except Exception as e:
-                    logger.error(f"Error applying date filter: {e}")
-        
-        return filtered_df
-        
-    except Exception as e:
-        logger.error(f"Error applying filters: {e}")
-        return df
-
-# UI Components
-def render_header():
-    """Render application header"""
-    st.markdown("""
-    <div class="main-header">
-        <h1>🛡️ Cybercrime Detection Dashboard</h1>
-        <p>Advanced Threat Intelligence & Law Enforcement Platform</p>
+    section_html = f"""
+    <div class="info-section {section_class}">
+        <div class="section-title">{icon} {title}</div>
+        {items_html}
     </div>
-    """, unsafe_allow_html=True)
+    """
 
-def render_system_status():
-    """Render system status indicators"""
-    st.subheader("📡 System Status")
-    
-    # Test API connectivity
-    try:
-        response = requests.get(MAIN_URL, timeout=5)
-        if response.status_code == 200:
-            st.success("🟢 API Connected")
-        else:
-            st.error(f"🔴 API Error (HTTP {response.status_code})")
-    except requests.exceptions.Timeout:
-        st.warning("🟡 API Timeout")
-    except requests.exceptions.ConnectionError:
-        st.error("🔴 Connection Failed")
-    except Exception as e:
-        st.error(f"🔴 System Error: {str(e)}")
-    
-    # Data freshness indicator
-    if st.session_state.last_refresh:
-        time_diff = datetime.datetime.now() - st.session_state.last_refresh
-        minutes_ago = time_diff.total_seconds() / 60
-        
-        if minutes_ago < 5:
-            st.success(f"✅ Data Fresh ({int(minutes_ago)}m ago)")
-        elif minutes_ago < 30:
-            st.warning(f"⚠️ Data Aging ({int(minutes_ago)}m ago)")
-        else:
-            st.error(f"🔴 Data Stale ({int(minutes_ago)}m ago)")
-    else:
-        st.info("📊 No data loaded")
+    st.markdown(section_html, unsafe_allow_html=True)
 
-def render_data_controls():
-    """Render data management controls"""
-    st.subheader("🔄 Data Management")
-    
-    col1, col2 = st.columns(2)
-    
+
+def show_detailed_view(row_data):
+    """Show detailed view of selected row with improved layout"""
+    st.markdown("---")
+    st.subheader("� Detailed Intelligence Report")
+
+    # Add Report to Police button at the top
+    col_header1, col_header2, col_header3 = st.columns([2, 1, 1])
+
+    with col_header1:
+        st.markdown(f"**Ad ID:** `{row_data.get('id', 'N/A')}`")
+
+    with col_header2:
+        if row_data.get("is_scam") == 0:
+            st.markdown(
+                '<span class="legit-badge">✓ LEGIT</span>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<span class="scam-badge">⚠️ SCAM</span>',
+                unsafe_allow_html=True,
+            )
+
+    with col_header3:
+        if row_data.get("reported") == 1:
+            st.markdown(
+                '<span class="legit-badge">✓ Reported</span>',
+                unsafe_allow_html=True,
+            )
+        else:
+            if st.button(
+                "🚨 Report",
+                type="primary",
+                key="report_button",
+                use_container_width=True,
+            ):
+                report_to_police(row_data.get("id"))
+
+    st.divider()
+
+    # Use tabs for better organization
+    tab1, tab2, tab3 = st.tabs(["📊 Overview", "📝 Content", "🔍 Analysis"])
+
+    with tab1:
+        # Basic Information in columns
+        info_col1, info_col2 = st.columns(2)
+
+        with info_col1:
+            st.markdown("##### 📄 Basic Info")
+            st.write(f"**Page Name:** {row_data.get('page_name', 'N/A')}")
+            st.write(f"**Page Likes:** {row_data.get('page_like_count', 'N/A')}")
+            st.write(f"**Is Active:** {'Yes' if row_data.get('is_active') else 'No'}")
+            st.write(f"**Date Scraped:** {row_data.get('date_scraped', 'N/A')}")
+
+            # Profile Picture
+            if row_data.get("page_profile_picture_url"):
+                st.markdown("##### 🖼️ Profile Picture")
+                st.image(row_data["page_profile_picture_url"], width=200)
+
+        with info_col2:
+            st.markdown("##### 🚨 Threat Assessment")
+            scam_status = "SCAM" if row_data.get("is_scam", False) else "LEGIT"
+            st.write(f"**Status:** {scam_status}")
+            st.write(f"**Type:** {row_data.get('scam_type', 'N/A')}")
+            st.write(f"**Threat Level:** {row_data.get('threat_level', 'N/A')}")
+            st.write(f"**Report Count:** {row_data.get('report_count', 0)}")
+
+            # URLs
+            if row_data.get("page_profile_uri"):
+                st.markdown("##### 🌐 Links")
+                st.markdown(f"[View Profile]({row_data['page_profile_uri']})")
+            if row_data.get("ad_url"):
+                st.markdown(f"[View Ad]({row_data['ad_url']})")
+
+    with tab2:
+        # Ad Text and Explanation
+        if row_data.get("ad_text"):
+            st.markdown("##### 📝 Ad Text")
+            with st.container():
+                st.text_area(
+                    "Ad Content",
+                    value=row_data["ad_text"],
+                    height=200,
+                    disabled=True,
+                    label_visibility="collapsed",
+                )
+
+        if row_data.get("explanation"):
+            st.markdown("##### 💡 AI Analysis")
+            st.write(row_data["explanation"])
+
+    with tab3:
+        # Display analysis sections
+        st.markdown("##### 🔍 Detailed Findings")
+
+        display_list_section(row_data, "summary", "Summary", "📋", "summary")
+        display_list_section(row_data, "links_found", "Links Found", "🔗", "links")
+        display_list_section(
+            row_data, "scam_patterns", "Scam Patterns", "🔍", "patterns"
+        )
+        display_list_section(row_data, "red_flags", "Red Flags", "🚩", "red-flags")
+        display_list_section(
+            row_data, "recommendations", "Recommendations", "💼", "recommendations"
+        )
+
+
+def paginate_dataframe(df, page_size, page_num):
+    """Paginate dataframe"""
+    start_idx = (page_num - 1) * page_size
+    end_idx = start_idx + page_size
+    return df.iloc[start_idx:end_idx]
+
+
+def show_pagination_controls(total_rows, rows_per_page, current_page):
+    """Show pagination controls"""
+    total_pages = math.ceil(total_rows / rows_per_page)
+
+    if total_pages <= 1:
+        return current_page
+
+    st.markdown("---")
+
+    # Pagination controls
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+
     with col1:
-        if st.button("🔄 Refresh Data", type="primary", use_container_width=True):
-            with st.spinner("Fetching latest intelligence..."):
-                st.session_state.loading = True
-                load_data_from_api.clear()  # Clear cache
-                data, error = load_data_from_api()
-                
-                if error:
-                    st.session_state.error_message = error
-                    st.error(f"❌ {error}")
-                else:
-                    st.session_state.data = data
-                    st.session_state.last_refresh = datetime.datetime.now()
-                    st.session_state.current_page = 1
-                    st.session_state.error_message = None
-                    st.success(f"✅ Loaded {len(data)} records")
-                    st.balloons()
-                
-                st.session_state.loading = False
-                st.rerun()
-    
+        if st.button("⏮️ First", disabled=(current_page == 1)):
+            st.session_state.current_page = 1
+            st.rerun()
+
     with col2:
-        if st.button("📊 Export Data", use_container_width=True):
-            if st.session_state.data:
-                try:
-                    df_export = pd.DataFrame(st.session_state.data)
-                    csv_data = df_export.to_csv(index=False)
-                    
-                    st.download_button(
-                        label="💾 Download CSV",
-                        data=csv_data,
-                        file_name=f"cybercrime_intel_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                except Exception as e:
-                    st.error(f"Export failed: {str(e)}")
-            else:
-                st.info("No data to export")
+        if st.button("◀️ Previous", disabled=(current_page == 1)):
+            st.session_state.current_page = current_page - 1
+            st.rerun()
 
-def render_view_selector():
-    """Render view mode selector"""
-    st.subheader("👀 Dashboard Views")
-    
-    view_options = {
-        "📋 Tactical Overview": "overview",
-        "📊 Analytics Center": "analytics", 
-        "🔍 Case Investigation": "detailed"
-    }
-    
-    selected_view = st.radio(
-        "Select view mode:",
-        list(view_options.keys()),
-        index=list(view_options.values()).index(st.session_state.view_mode)
-    )
-    
-    st.session_state.view_mode = view_options[selected_view]
+    with col3:
+        st.write(f"Page {current_page} of {total_pages} ({total_rows} total records)")
 
-def render_filters():
-    """Render intelligent filter controls"""
-    with st.expander("🎯 Intelligence Filters", expanded=True):
-        if not st.session_state.data:
-            st.info("Load data to access filters")
-            return
-        
-        df = pd.DataFrame(st.session_state.data)
-        
-        # Quick action buttons
-        st.write("**🚀 Quick Filters:**")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("🚨 High Threats", use_container_width=True):
-                st.session_state.scam_filter = "Scam Only"
-                st.session_state.threat_filter = ["HIGH"]
-                st.rerun()
-        
-        with col2:
-            if st.button("✅ Safe Content", use_container_width=True):
-                st.session_state.scam_filter = "Legit Only"
-                st.rerun()
-        
-        with col3:
-            if st.button("🗑️ Clear All", use_container_width=True):
-                st.session_state.scam_filter = "All"
-                st.session_state.threat_filter = []
-                st.session_state.date_range = None
-                st.rerun()
-        
-        st.divider()
-        
-        # Classification filter
-        scam_options = ["All Records", "🚨 Threats Only", "✅ Safe Only"]
-        scam_filter_display = st.selectbox("🎯 Content Classification:", scam_options)
-        
-        if "Threats Only" in scam_filter_display:
-            st.session_state.scam_filter = "Scam Only"
-        elif "Safe Only" in scam_filter_display:
-            st.session_state.scam_filter = "Legit Only"
-        else:
-            st.session_state.scam_filter = "All"
-        
-        # Threat level filter
-        if "threat_level" in df.columns:
-            threat_levels = ["HIGH", "MEDIUM", "LOW"]
-            existing_levels = df["threat_level"].astype(str).str.upper().unique()
-            available_levels = [level for level in threat_levels if level in existing_levels]
-            
-            if len(df[~df["threat_level"].astype(str).str.upper().isin(threat_levels)]) > 0:
-                available_levels.append("OTHER")
-            
-            st.session_state.threat_filter = st.multiselect(
-                "⚠️ Threat Priority Levels:",
-                available_levels,
-                default=st.session_state.get("threat_filter", available_levels)
+    with col4:
+        if st.button("Next ▶️", disabled=(current_page == total_pages)):
+            st.session_state.current_page = current_page + 1
+            st.rerun()
+
+    with col5:
+        if st.button("Last ⏭️", disabled=(current_page == total_pages)):
+            st.session_state.current_page = total_pages
+            st.rerun()
+
+    # Page jump
+    st.markdown("---")
+    jump_col1, jump_col2, jump_col3 = st.columns([1, 1, 2])
+
+    with jump_col1:
+        page_input = st.number_input(
+            "Jump to page:",
+            min_value=1,
+            max_value=total_pages,
+            value=current_page,
+            key="page_jump",
+        )
+
+    with jump_col2:
+        if st.button("Go"):
+            st.session_state.current_page = page_input
+            st.rerun()
+
+    return current_page
+
+
+# Data already loaded earlier; just reference
+data = st.session_state.data
+
+if data:
+    df = pd.DataFrame(data)
+
+    # Global date parsing (ensure consistent dtype for sorting/filtering)
+    if "date_scraped" in df.columns:
+        df["date_scraped"] = pd.to_datetime(
+            df["date_scraped"], errors="coerce", utc=True
+        )
+
+    # Ensure ID column is string type to avoid Arrow serialization issues
+    if "id" in df.columns:
+        df["id"] = df["id"].astype(str)
+
+    # Normalize is_scam to boolean for consistent filtering
+    if "is_scam" in df.columns:
+        df["is_scam"] = df["is_scam"].astype(bool)
+
+    # Normalize threat_level early for consistent filtering
+    if "threat_level" in df.columns:
+        df["_threat_normalized"] = (
+            df["threat_level"].fillna("OTHER").astype(str).str.upper().str.strip()
+        )
+        df["_threat_normalized"] = df["_threat_normalized"].where(
+            df["_threat_normalized"].isin(["HIGH", "MEDIUM", "LOW"]), "OTHER"
+        )
+
+    # Convert numeric columns to proper types, handling errors
+    if "page_like_count" in df.columns:
+        df["page_like_count"] = (
+            pd.to_numeric(df["page_like_count"], errors="coerce").fillna(0).astype(int)
+        )
+
+    if "report_count" in df.columns:
+        df["report_count"] = (
+            pd.to_numeric(df["report_count"], errors="coerce").fillna(0).astype(int)
+        )
+
+    if "reported" in df.columns:
+        df["reported"] = (
+            pd.to_numeric(df["reported"], errors="coerce").fillna(0).astype(int)
+        )
+
+    # Apply filters
+    scam_filter = st.session_state.get("scam_filter", "All")
+    if scam_filter == "Scam Only" and "is_scam" in df.columns:
+        # Handle both boolean and numeric values
+        df = df[(df["is_scam"] == True) | (df["is_scam"] == 1)]
+    elif scam_filter == "Legit Only" and "is_scam" in df.columns:
+        # Handle both boolean and numeric values
+        df = df[(df["is_scam"] == False) | (df["is_scam"] == 0)]
+
+    threat_filter = st.session_state.get("threat_filter", [])
+    if threat_filter and "_threat_normalized" in df.columns:
+        df = df[df["_threat_normalized"].isin(threat_filter)]
+
+    # Apply date range filter (single application here) using session state.
+    # Handle transitional single-date selection gracefully.
+    if "date_range" in st.session_state and "date_scraped" in df.columns:
+        raw_range = st.session_state["date_range"]
+        start_date = end_date = None
+        # Normalize raw_range from possible types: date, (date,), (start,end)
+        if isinstance(raw_range, (list, tuple)):
+            if len(raw_range) == 2 and raw_range[0] and raw_range[1]:
+                start_date, end_date = raw_range
+            elif len(raw_range) == 1 and raw_range[0]:
+                start_date = end_date = raw_range[0]
+        else:  # single date object
+            start_date = end_date = raw_range
+
+        if start_date is not None and end_date is not None:
+            if end_date < start_date:
+                start_date, end_date = end_date, start_date
+            include_missing_dates = st.session_state.get("include_missing_dates", True)
+            ds = pd.to_datetime(df["date_scraped"], errors="coerce", utc=True)
+            tzinfo = ds.dt.tz
+            start_ts = pd.Timestamp(
+                datetime.datetime.combine(start_date, datetime.time.min)
             )
-        
-        # Date range filter
-        if "date_scraped" in df.columns:
-            df_dates = df.dropna(subset=["date_scraped"])
-            if not df_dates.empty:
-                date_col = pd.to_datetime(df_dates["date_scraped"], errors="coerce")
-                valid_dates = date_col.dropna()
-                
-                if not valid_dates.empty:
-                    min_date = valid_dates.min().date()
-                    max_date = valid_dates.max().date()
-                    
-                    st.write("**📅 Date Range Filter:**")
-                    
-                    # Quick date buttons
-                    date_col1, date_col2, date_col3 = st.columns(3)
-                    today = datetime.date.today()
-                    
-                    with date_col1:
-                        if st.button("Today", use_container_width=True):
-                            st.session_state.date_range = (today, today)
-                            st.rerun()
-                    
-                    with date_col2:
-                        if st.button("Last Week", use_container_width=True):
-                            week_ago = today - timedelta(days=7)
-                            st.session_state.date_range = (week_ago, today)
-                            st.rerun()
-                    
-                    with date_col3:
-                        if st.button("Last Month", use_container_width=True):
-                            month_ago = today - timedelta(days=30)
-                            st.session_state.date_range = (month_ago, today)
-                            st.rerun()
-                    
-                    # Custom date range
-                    current_range = st.session_state.get("date_range", (min_date, max_date))
-                    st.session_state.date_range = st.date_input(
-                        "Custom date range:",
-                        value=current_range,
-                        min_value=min_date,
-                        max_value=max_date
-                    )
-                    
-                    st.session_state.include_missing_dates = st.checkbox(
-                        "Include records with missing dates",
-                        value=st.session_state.get("include_missing_dates", True)
-                    )
-
-def render_metrics(df: pd.DataFrame):
-    """Render key performance metrics"""
-    st.subheader("📊 Intelligence Overview")
-    
-    try:
-        total_records = len(df)
-        
-        if total_records == 0:
-            st.warning("No records match current filters")
-            return
-        
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        with col1:
-            st.metric("📋 Total Cases", format_number(total_records))
-        
-        with col2:
-            if "is_scam" in df.columns:
-                threat_count = len(df[df["is_scam"] == True])
-                threat_rate = (threat_count / total_records * 100) if total_records > 0 else 0
-                st.metric("🚨 Active Threats", format_number(threat_count), f"{threat_rate:.1f}%")
-            else:
-                st.metric("🚨 Active Threats", "N/A")
-        
-        with col3:
-            if "is_scam" in df.columns:
-                safe_count = len(df[df["is_scam"] == False])
-                st.metric("✅ Verified Safe", format_number(safe_count))
-            else:
-                st.metric("✅ Verified Safe", "N/A")
-        
-        with col4:
-            if "threat_level" in df.columns:
-                high_threats = len(df[df["threat_level"].astype(str).str.upper() == "HIGH"])
-                st.metric("🔥 Critical Cases", format_number(high_threats))
-            else:
-                st.metric("🔥 Critical Cases", "N/A")
-        
-        with col5:
-            if "reported" in df.columns:
-                reported_count = len(df[df["reported"] == 1])
-                reported_rate = (reported_count / total_records * 100) if total_records > 0 else 0
-                st.metric("📧 Reported", format_number(reported_count), f"{reported_rate:.1f}%")
-            else:
-                st.metric("📧 Reported", "N/A")
-                
-    except Exception as e:
-        logger.error(f"Error rendering metrics: {e}")
-        st.error(f"Error calculating metrics: {str(e)}")
-
-def render_overview_charts(df: pd.DataFrame):
-    """Render overview charts with error handling"""
-    if len(df) == 0:
-        return
-    
-    try:
-        st.subheader("📈 Threat Intelligence Overview")
-        
-        chart_col1, chart_col2, chart_col3 = st.columns(3)
-        
-        with chart_col1:
-            if "is_scam" in df.columns:
-                threat_counts = df["is_scam"].value_counts()
-                if not threat_counts.empty:
-                    fig_threats = px.pie(
-                        values=threat_counts.values,
-                        names=["✅ Safe" if not x else "🚨 Threat" for x in threat_counts.index],
-                        title="Threat Classification",
-                        color_discrete_map={"🚨 Threat": "#ff6b6b", "✅ Safe": "#51cf66"},
-                        hole=0.4
-                    )
-                    fig_threats.update_traces(textposition="inside", textinfo="percent+label")
-                    fig_threats.update_layout(height=300)
-                    st.plotly_chart(fig_threats, use_container_width=True)
-        
-        with chart_col2:
-            if "threat_level" in df.columns:
-                threat_levels = df["threat_level"].fillna("UNKNOWN").astype(str).str.upper()
-                threat_levels = threat_levels.where(threat_levels.isin(["HIGH", "MEDIUM", "LOW"]), "OTHER")
-                level_counts = threat_levels.value_counts()
-                
-                if not level_counts.empty:
-                    colors = {"HIGH": "#ff6b6b", "MEDIUM": "#ffa502", "LOW": "#26de81", "OTHER": "#a4b0be", "UNKNOWN": "#6c757d"}
-                    fig_levels = px.bar(
-                        x=level_counts.index,
-                        y=level_counts.values,
-                        title="Threat Severity",
-                        color=level_counts.index,
-                        color_discrete_map=colors
-                    )
-                    fig_levels.update_layout(height=300, showlegend=False)
-                    st.plotly_chart(fig_levels, use_container_width=True)
-        
-        with chart_col3:
-            if "reported" in df.columns:
-                reported_status = df["reported"].map({1: "📧 Reported", 0: "⏳ Pending"})
-                status_counts = reported_status.value_counts()
-                
-                if not status_counts.empty:
-                    fig_status = px.pie(
-                        values=status_counts.values,
-                        names=status_counts.index,
-                        title="Enforcement Status",
-                        color_discrete_map={"📧 Reported": "#51cf66", "⏳ Pending": "#ffa502"},
-                        hole=0.4
-                    )
-                    fig_status.update_traces(textposition="inside", textinfo="percent+label")
-                    fig_status.update_layout(height=300)
-                    st.plotly_chart(fig_status, use_container_width=True)
-                    
-    except Exception as e:
-        logger.error(f"Error rendering charts: {e}")
-        st.error(f"Error generating charts: {str(e)}")
-
-def render_data_table(df: pd.DataFrame):
-    """Render main data table with robust pagination"""
-    if len(df) == 0:
-        st.warning("No records found matching current filters")
-        return
-    
-    try:
-        st.subheader("🗃️ Intelligence Database")
-        
-        # Column selection and formatting
-        essential_columns = ["id", "page_name", "is_scam", "scam_type", "threat_level", 
-                           "page_like_count", "report_count", "reported", "date_scraped"]
-        
-        available_columns = [col for col in essential_columns if col in df.columns]
-        
-        if not available_columns:
-            st.error("No essential columns found in data")
-            return
-        
-        display_df = df[available_columns].copy()
-        
-        # Format columns safely
-        if "threat_level" in display_df.columns:
-            threat_formatted = display_df["threat_level"].astype(str).str.upper()
-            display_df["threat_level"] = threat_formatted.where(
-                threat_formatted.isin(["HIGH", "MEDIUM", "LOW"]), "OTHER"
+            end_ts = pd.Timestamp(
+                datetime.datetime.combine(end_date, datetime.time.max)
             )
-        
+            if tzinfo is not None:
+                start_ts = start_ts.tz_localize(tzinfo)
+                end_ts = end_ts.tz_localize(tzinfo)
+            base_mask = (ds >= start_ts) & (ds <= end_ts)
+            mask = base_mask | ds.isna() if include_missing_dates else base_mask
+            df = df[mask]
+
+    # Dashboard metrics - responsive grid
+    st.subheader("📊 Overview Metrics")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        total_ads = len(df)
+        st.metric("Total Ads", total_ads, help="Total number of ads in current view")
+
+    with col2:
+        scam_count = len(df[df["is_scam"] == True]) if "is_scam" in df.columns else 0
+        scam_pct = f"{(scam_count/total_ads*100):.1f}%" if total_ads > 0 else "0%"
+        st.metric(
+            "Scam Ads",
+            scam_count,
+            delta=scam_pct,
+            delta_color="inverse",
+            help="Number of detected scam ads",
+        )
+
+    with col3:
+        legit_count = len(df[df["is_scam"] == False]) if "is_scam" in df.columns else 0
+        legit_pct = f"{(legit_count/total_ads*100):.1f}%" if total_ads > 0 else "0%"
+        st.metric(
+            "Legit Ads", legit_count, delta=legit_pct, help="Number of legitimate ads"
+        )
+
+    col4, col5 = st.columns(2)
+
+    with col4:
+        high_threat = (
+            len(df[df["_threat_normalized"] == "HIGH"])
+            if "_threat_normalized" in df.columns
+            else 0
+        )
+        st.metric(
+            "High Threat",
+            high_threat,
+            help="Ads flagged as high threat",
+            delta="Priority" if high_threat > 0 else None,
+            delta_color="inverse",
+        )
+
+    with col5:
+        reported_count = len(df[df["reported"] == 1]) if "reported" in df.columns else 0
+        st.metric("Reported", reported_count, help="Ads reported to authorities")
+
+    # Filter summary badge (compact version)
+    active_filters = []
+    scam_filter_state = st.session_state.get("scam_filter")
+    if scam_filter_state and scam_filter_state != "All":
+        active_filters.append(scam_filter_state.replace(" Only", ""))
+    tfilt = st.session_state.get("threat_filter")
+    if tfilt and len(tfilt) < 4:  # Only show if filtered
+        active_filters.append("Threat: " + ",".join(tfilt))
+
+    # Only show date filter if it's actually set and not the full range
+    date_range_val = st.session_state.get("date_range")
+    if date_range_val is not None:
+        active_filters.append("Date Filtered")
+
+    if active_filters:
+        st.info(f"🔍 **Active Filters:** {' • '.join(active_filters)}")
+
+    st.divider()
+
+    # Charts
+    if len(df) > 0:
+        st.subheader("📈 Analytics Overview")
+
+        # Main charts in tabs for better organization
+        tab1, tab2, tab3 = st.tabs(["📊 Distribution", "📈 Trends", "🔍 Deep Dive"])
+
+        with tab1:
+            chart_col1, chart_col2 = st.columns(2)
+
+            with chart_col1:
+                # Scam vs Legit pie chart
+                if "is_scam" in df.columns:
+                    scam_counts = df["is_scam"].value_counts()
+                    fig_pie = px.pie(
+                        values=scam_counts.values,
+                        names=["Legit" if not x else "Scam" for x in scam_counts.index],
+                        title="Scam vs Legit Distribution",
+                        color_discrete_map={"Scam": "#ff4b4b", "Legit": "#00cc88"},
+                        hole=0.4,
+                    )
+                    fig_pie.update_traces(
+                        textposition="inside", textinfo="percent+label"
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+            with chart_col2:
+                # Threat level distribution
+                if "_threat_normalized" in df.columns:
+                    order = ["HIGH", "MEDIUM", "LOW", "OTHER"]
+                    threat_counts = (
+                        df["_threat_normalized"]
+                        .value_counts()
+                        .reindex(order, fill_value=0)
+                        .reset_index()
+                    )
+                    threat_counts.columns = ["Threat Level", "Count"]
+
+                    fig_bar = px.bar(
+                        threat_counts,
+                        x="Threat Level",
+                        y="Count",
+                        title="Threat Level Distribution",
+                        color="Threat Level",
+                        category_orders={"Threat Level": order},
+                        color_discrete_map={
+                            "HIGH": "#ff4b4b",
+                            "MEDIUM": "#ffa500",
+                            "LOW": "#00cc88",
+                            "OTHER": "#6c757d",
+                        },
+                        text="Count",
+                    )
+                    fig_bar.update_traces(textposition="outside")
+                    fig_bar.update_layout(
+                        yaxis_title="Number of Ads",
+                        xaxis_title="Threat Level",
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+        with tab2:
+            # Time series volume
+            if "date_scraped" in df.columns and df["date_scraped"].notna().any():
+                daily_counts = (
+                    df["date_scraped"].dt.date.value_counts().sort_index().reset_index()
+                )
+                daily_counts.columns = ["Date", "Ads"]
+                if not daily_counts.empty:
+                    fig_daily = px.line(
+                        daily_counts,
+                        x="Date",
+                        y="Ads",
+                        markers=True,
+                        title="Daily Ad Volume Trend",
+                    )
+                    fig_daily.update_layout(
+                        xaxis_title="Date",
+                        yaxis_title="Number of Ads",
+                        hovermode="x unified",
+                    )
+                    st.plotly_chart(fig_daily, use_container_width=True)
+
+                # Threat level trend (stacked area)
+                if "_threat_normalized" in df.columns:
+                    tl_trend = (
+                        df.assign(_date=df["date_scraped"].dt.date)
+                        .groupby(["_date", "_threat_normalized"])
+                        .size()
+                        .reset_index(name="count")
+                    )
+                    if not tl_trend.empty:
+                        fig_area = px.area(
+                            tl_trend,
+                            x="_date",
+                            y="count",
+                            color="_threat_normalized",
+                            title="Threat Level Trend Over Time",
+                            category_orders={
+                                "_threat_normalized": ["HIGH", "MEDIUM", "LOW", "OTHER"]
+                            },
+                            color_discrete_map={
+                                "HIGH": "#ff4b4b",
+                                "MEDIUM": "#ffa500",
+                                "LOW": "#00cc88",
+                                "OTHER": "#6c757d",
+                            },
+                        )
+                        fig_area.update_layout(
+                            xaxis_title="Date",
+                            yaxis_title="Number of Ads",
+                            legend_title="Threat Level",
+                            hovermode="x unified",
+                        )
+                        st.plotly_chart(fig_area, use_container_width=True)
+            else:
+                st.info("📅 No date information available for trend analysis")
+
+        with tab3:
+            # Top pages by scam ad frequency
+            if "page_name" in df.columns and "is_scam" in df.columns:
+                top_pages = (
+                    df[df["is_scam"] == True]["page_name"]
+                    .value_counts()
+                    .head(10)
+                    .reset_index()
+                )
+                if not top_pages.empty:
+                    top_pages.columns = ["Page", "Scam Ads"]
+                    fig_top_pages = px.bar(
+                        top_pages,
+                        x="Scam Ads",
+                        y="Page",
+                        orientation="h",
+                        title="Top 10 Pages by Scam Ad Count",
+                        color="Scam Ads",
+                        color_continuous_scale="Reds",
+                        text="Scam Ads",
+                    )
+                    fig_top_pages.update_traces(textposition="outside")
+                    fig_top_pages.update_layout(yaxis_categoryorder="total ascending")
+                    st.plotly_chart(fig_top_pages, use_container_width=True)
+                else:
+                    st.info("No scam ads found in current view")
+
+            st.caption(
+                "💡 Deep dive analytics help identify patterns and priority targets for investigation."
+            )
+
+    st.divider()
+
+    # Main data table with pagination
+    st.subheader("📋 Ads Data Table")
+
+    # Instruction badge prompting selection
+    st.info("👆 **Tip:** Click any row to view detailed analysis below")
+
+    # Select important columns for the main table
+    important_columns = [
+        "id",
+        "page_name",
+        "is_scam",
+        "threat_level",
+        "scam_type",
+        "report_count",
+        "reported",
+        "date_scraped",
+        "ad_url",
+    ]
+
+    # Filter columns that exist in the dataframe
+    display_columns = [col for col in important_columns if col in df.columns]
+
+    if display_columns:
+        # Create display dataframe
+        display_df = df[display_columns].copy()
+
+        # Use normalized threat level for display
+        if "threat_level" in display_df.columns and "_threat_normalized" in df.columns:
+            display_df["threat_level"] = df["_threat_normalized"]
+
+        # Format the display
         if "is_scam" in display_df.columns:
-            display_df["Classification"] = display_df["is_scam"].apply(
-                lambda x: "🚨 THREAT" if x else "✅ SAFE"
+            display_df["Status"] = display_df["is_scam"].apply(
+                lambda x: "SCAM" if x else "LEGIT"
             )
             display_df = display_df.drop("is_scam", axis=1)
-        
+
+        # Format reported column with tick/cross
         if "reported" in display_df.columns:
-            display_df["Status"] = display_df["reported"].apply(
-                lambda x: "📧 Reported" if x == 1 else "⏳ Pending"
+            display_df["Reported"] = display_df.apply(
+                lambda row: (
+                    "✅"
+                    if row["reported"] == 1
+                    else (
+                        "❌"
+                        if ("Status" in display_df.columns and row["Status"] != "LEGIT")
+                        else "-"
+                    )
+                ),
+                axis=1,
             )
             display_df = display_df.drop("reported", axis=1)
-        
-        # Sorting controls
-        sort_col1, sort_col2, sort_col3 = st.columns([2, 1, 1])
-        
+
+        # Paginate the data
+        current_page = st.session_state.current_page
+        rows_per_page = st.session_state.rows_per_page
+
+        # --- Server-side Sorting Controls (applied BEFORE pagination) ---
+        st.markdown("##### ⚙️ Sort & Filter")
+
+        sort_col1, sort_col2 = st.columns([3, 1])
+
         with sort_col1:
-            sort_column = st.selectbox(
-                "🔢 Sort by:", 
-                list(display_df.columns),
-                key="sort_column"
+            sort_cols_available = [c for c in display_df.columns if c not in []]
+            default_sort_col = (
+                "date_scraped"
+                if "date_scraped" in sort_cols_available
+                else sort_cols_available[0]
             )
-        
+            sort_col = st.selectbox(
+                "Sort by",
+                sort_cols_available,
+                index=sort_cols_available.index(default_sort_col),
+                key="sort_column_select",
+                label_visibility="collapsed",
+            )
+
         with sort_col2:
-            sort_direction = st.selectbox(
-                "📊 Order:", 
-                ["Ascending", "Descending"],
-                key="sort_direction"
+            sort_dir = st.selectbox(
+                "Order",
+                ["↓ Desc", "↑ Asc"],
+                index=0,
+                key="sort_direction_select",
+                label_visibility="collapsed",
             )
-        
-        with sort_col3:
-            st.session_state.rows_per_page = st.selectbox(
-                "📄 Rows:", 
-                [10, 25, 50, 100], 
-                index=1
-            )
-        
-        # Apply sorting
-        try:
-            ascending = (sort_direction == "Ascending")
-            
-            if sort_column in ["Classification", "Status"]:
-                # Handle categorical sorting
-                if sort_column == "Classification":
-                    sort_map = {"🚨 THREAT": 0, "✅ SAFE": 1}
-                else:  # Status
-                    sort_map = {"📧 Reported": 0, "⏳ Pending": 1}
-                sort_key = display_df[sort_column].map(sort_map).fillna(999)
-            elif sort_column == "threat_level":
-                level_map = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, "OTHER": 3}
-                sort_key = display_df[sort_column].map(level_map).fillna(999)
-            elif "date" in sort_column.lower():
-                sort_key = pd.to_datetime(display_df[sort_column], errors="coerce")
+
+        ascending = True if "Asc" in sort_dir else False
+
+        col_series = display_df[sort_col]
+
+        # Build a stable, uniform sort key to avoid mixed-type comparison errors
+        if sort_col == "Status":
+            order_map = {"SCAM": 0, "LEGIT": 1}
+            sort_key = col_series.map(order_map).fillna(99)
+        elif sort_col == "Reported":
+            order_map = {"✅": 0, "❌": 1}
+            sort_key = col_series.map(order_map).fillna(99)
+        elif sort_col.lower().startswith("date"):
+            sort_key = pd.to_datetime(col_series, errors="coerce")
+        else:
+            # Try numeric; if largely numeric use it; else fallback to string
+            numeric_try = pd.to_numeric(col_series, errors="coerce")
+            numeric_ratio = numeric_try.notna().mean()
+            if numeric_ratio >= 0.8:  # majority numeric
+                # Fill NaNs with extreme sentinel so they sort last/first
+                fill_value = (
+                    numeric_try.max() + 1 if ascending else numeric_try.min() - 1
+                )
+                sort_key = numeric_try.fillna(fill_value)
             else:
-                # Try numeric first, then string
-                numeric_vals = pd.to_numeric(display_df[sort_column], errors="coerce")
-                if numeric_vals.notna().sum() / len(display_df) > 0.5:  # Mostly numeric
-                    sort_key = numeric_vals.fillna(-999 if ascending else 999999)
-                else:
-                    sort_key = display_df[sort_column].astype(str)
-            
-            display_df = display_df.iloc[sort_key.argsort()[::-1 if not ascending else 1]]
-            
-        except Exception as e:
-            logger.error(f"Sorting error: {e}")
-            st.warning("Sorting failed, showing unsorted data")
-        
-        # Pagination
-        total_rows = len(display_df)
-        total_pages = math.ceil(total_rows / st.session_state.rows_per_page)
-        
-        if st.session_state.current_page > total_pages:
-            st.session_state.current_page = max(1, total_pages)
-        
-        start_idx = (st.session_state.current_page - 1) * st.session_state.rows_per_page
-        end_idx = start_idx + st.session_state.rows_per_page
-        paginated_df = display_df.iloc[start_idx:end_idx]
-        
-        # Display table
+                sort_key = col_series.astype(str)
+
+        display_df = (
+            display_df.assign(_sort_key=sort_key)
+            .sort_values("_sort_key", ascending=ascending, kind="mergesort")
+            .drop(columns=["_sort_key"])
+        )
+        # mergesort is stable so future multi-column sorts can layer
+
+        # Reset page if it's out of bounds
+        total_pages = math.ceil(len(display_df) / rows_per_page)
+        if current_page > total_pages and total_pages > 0:
+            st.session_state.current_page = 1
+            current_page = 1
+
+        paginated_df = paginate_dataframe(display_df, rows_per_page, current_page)
+
+        # Display the paginated table
         event = st.dataframe(
             paginated_df,
             use_container_width=True,
@@ -799,585 +1238,105 @@ def render_data_table(df: pd.DataFrame):
             on_select="rerun",
             selection_mode="single-row",
             column_config={
-                "id": st.column_config.TextColumn("🆔 Case ID", width="small"),
-                "page_name": st.column_config.TextColumn("📄 Subject", width="medium"), 
-                "Classification": st.column_config.TextColumn("🎯 Type", width="small"),
-                "scam_type": st.column_config.TextColumn("🏷️ Category", width="medium"),
-                "threat_level": st.column_config.TextColumn("⚠️ Priority", width="small"),
-                "page_like_count": st.column_config.NumberColumn("👥 Reach", width="small"),
-                "report_count": st.column_config.NumberColumn("📊 Reports", width="small"),
-                "Status": st.column_config.TextColumn("📮 Status", width="small"),
-                "date_scraped": st.column_config.DatetimeColumn("📅 Date", width="medium")
-            }
+                "id": st.column_config.TextColumn("ID"),  # Add ID column config
+                "Status": st.column_config.TextColumn("Status"),
+                "threat_level": st.column_config.TextColumn("Threat Level"),
+                "page_like_count": st.column_config.NumberColumn("Page Likes"),
+                "report_count": st.column_config.NumberColumn("Reports"),
+                "Reported": st.column_config.TextColumn("Reported"),
+                "ad_url": st.column_config.LinkColumn("Ad URL", display_text="View Ad"),
+            },
         )
-        
-        # Pagination controls
-        if total_pages > 1:
-            nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns([1, 1, 2, 1, 1])
-            
-            with nav_col1:
-                if st.button("⏮️ First", disabled=st.session_state.current_page == 1):
-                    st.session_state.current_page = 1
-                    st.rerun()
-            
-            with nav_col2:
-                if st.button("◀️ Prev", disabled=st.session_state.current_page == 1):
-                    st.session_state.current_page -= 1
-                    st.rerun()
-            
-            with nav_col3:
-                st.info(f"Page {st.session_state.current_page} of {total_pages} ({total_rows:,} records)")
-            
-            with nav_col4:
-                if st.button("Next ▶️", disabled=st.session_state.current_page == total_pages):
-                    st.session_state.current_page += 1
-                    st.rerun()
-            
-            with nav_col5:
-                if st.button("Last ⏭️", disabled=st.session_state.current_page == total_pages):
-                    st.session_state.current_page = total_pages
-                    st.rerun()
-        
+
+        # Show pagination controls
+        show_pagination_controls(len(display_df), rows_per_page, current_page)
+
         # Handle row selection
         if event.selection.rows:
-            try:
-                selected_idx = event.selection.rows[0]
-                actual_idx = start_idx + selected_idx
-                selected_case = df.iloc[actual_idx].to_dict()
-                st.session_state.selected_row_id = safe_get_value(selected_case, "id", "")
-                
-                # Quick actions for selected case
-                render_quick_actions(selected_case)
-                
-            except Exception as e:
-                logger.error(f"Error handling selection: {e}")
-                st.error("Error processing selection")
-                
-    except Exception as e:
-        logger.error(f"Error rendering data table: {e}")
-        st.error(f"Error displaying data table: {str(e)}")
+            selected_row_index = event.selection.rows[0]
+            # Get the selected row from the paginated dataframe
+            selected_paginated_row = paginated_df.iloc[selected_row_index]
 
-def render_quick_actions(case_data: Dict):
-    """Render quick actions for selected case"""
-    st.divider()
-    st.subheader("⚡ Case Actions")
-    
-    action_col1, action_col2, action_col3, action_col4 = st.columns(4)
-    
-    with action_col1:
-        if st.button("🔍 Investigate", type="primary", use_container_width=True):
-            st.session_state.view_mode = "detailed"
-            st.rerun()
-    
-    with action_col2:
-        case_id = safe_get_value(case_data, "id", "")
-        is_reported = safe_get_value(case_data, "reported", 0) == 1
-        
-        if not is_reported and case_id:
-            if st.button("📧 Report", type="secondary", use_container_width=True):
-                success, message = safe_report_to_police(case_id)
-                if success:
-                    st.success(message)
-                    st.balloons()
+            # Get the ID from the selected row
+            selected_id = (
+                selected_paginated_row.get("id")
+                if "id" in selected_paginated_row
+                else None
+            )
+
+            if selected_id:
+                # Find the corresponding row in the original df using the ID
+                matching_row = df[df["id"] == selected_id]
+                if not matching_row.empty:
+                    selected_row_data = matching_row.iloc[0].to_dict()
+                    st.session_state.selected_row_id = selected_id
+
+                    # Show detailed view immediately
+                    show_detailed_view(selected_row_data)
                 else:
-                    st.error(message)
-                st.rerun()
-        else:
-            st.success("✅ Reported" if is_reported else "❌ No ID")
-    
-    with action_col3:
-        is_threat = safe_get_value(case_data, "is_scam", False)
-        if is_threat:
-            st.error("🚨 THREAT")
-        else:
-            st.success("✅ SAFE")
-    
-    with action_col4:
-        threat_level = safe_get_value(case_data, "threat_level", "UNKNOWN").upper()
-        if threat_level == "HIGH":
-            st.error("🔥 CRITICAL")
-        elif threat_level == "MEDIUM":
-            st.warning("⚠️ ELEVATED")
-        elif threat_level == "LOW":
-            st.success("✅ LOW")
-        else:
-            st.info("❓ UNKNOWN")
-
-def render_detailed_view(case_data: Dict):
-    """Render detailed case investigation view"""
-    st.header("🔍 Case Investigation Report")
-    
-    case_id = safe_get_value(case_data, "id", "UNKNOWN")
-    
-    # Case header
-    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
-    
-    with header_col1:
-        st.metric("🆔 Case ID", case_id)
-    
-    with header_col2:
-        if st.button("📋 Back to Overview", key="back_btn"):
-            st.session_state.view_mode = "overview"
-            st.rerun()
-    
-    with header_col3:
-        is_reported = safe_get_value(case_data, "reported", 0) == 1
-        if not is_reported:
-            if st.button("📧 File Report", type="primary", key="report_detailed"):
-                success, message = safe_report_to_police(case_id)
-                if success:
-                    st.success(message)
-                    st.balloons()
-                else:
-                    st.error(message)
-                st.rerun()
-        else:
-            st.success("✅ Case Filed")
-    
-    # Case details in tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📝 Evidence", "🧠 Analysis", "⚖️ Actions"])
-    
-    with tab1:
-        # Basic metrics
-        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-        
-        with metric_col1:
-            page_likes = safe_get_value(case_data, "page_like_count", 0)
-            st.metric("👥 Page Followers", format_number(page_likes))
-        
-        with metric_col2:
-            reports = safe_get_value(case_data, "report_count", 0)
-            st.metric("📊 Citizen Reports", reports)
-        
-        with metric_col3:
-            scam_type = safe_get_value(case_data, "scam_type", "Unknown")
-            st.metric("🏷️ Classification", scam_type)
-        
-        with metric_col4:
-            is_active = safe_get_value(case_data, "is_active", False)
-            status = "Active" if is_active else "Inactive"
-            st.metric("📡 Status", status)
-        
-        # Case information
-        st.subheader("📋 Case Information")
-        
-        info_col1, info_col2 = st.columns(2)
-        
-        with info_col1:
-            st.write(f"**📄 Page Name:** {safe_get_value(case_data, 'page_name', 'Unknown')}")
-            st.write(f"**📅 Date Scraped:** {safe_get_value(case_data, 'date_scraped', 'Unknown')}")
-            
-            threat_level = safe_get_value(case_data, "threat_level", "UNKNOWN").upper()
-            if threat_level == "HIGH":
-                st.error("🔥 HIGH THREAT - Immediate action required")
-            elif threat_level == "MEDIUM":
-                st.warning("⚠️ MEDIUM THREAT - Monitor closely")
-            elif threat_level == "LOW":
-                st.success("✅ LOW THREAT - Standard processing")
+                    st.error(f"Could not find data for selected ID: {selected_id}")
             else:
-                st.info("❓ THREAT LEVEL UNKNOWN")
-        
-        with info_col2:
-            profile_pic_url = safe_get_value(case_data, "page_profile_picture_url", "")
-            if profile_pic_url:
-                try:
-                    st.image(profile_pic_url, width=150, caption="Profile Picture")
-                except Exception:
-                    st.info("Profile picture unavailable")
-            else:
-                st.info("No profile picture available")
-    
-    with tab2:
-        st.subheader("📝 Digital Evidence")
-        
-        # Ad content
-        ad_text = safe_get_value(case_data, "ad_text", "")
-        if ad_text:
-            st.text_area("Advertisement Content:", value=ad_text, height=150, disabled=True)
+                st.error("Selected row does not have an ID")
         else:
-            st.info("No advertisement text available")
-        
-        # URLs found
-        links_found = safe_get_value(case_data, "links_found", [])
-        if links_found:
-            if not isinstance(links_found, list):
-                links_found = [links_found]
-            
-            st.subheader("🔗 Suspicious URLs")
-            st.warning("⚠️ Do not click these links - they may be malicious")
-            for i, link in enumerate(links_found, 1):
-                st.code(f"{i}. {link}")
-        
-        # Technical URLs
-        profile_uri = safe_get_value(case_data, "page_profile_uri", "")
-        ad_url = safe_get_value(case_data, "ad_url", "")
-        
-        if profile_uri or ad_url:
-            st.subheader("🌐 Source URLs")
-            if profile_uri:
-                st.code(f"Profile: {profile_uri}")
-            if ad_url:
-                st.code(f"Ad URL: {ad_url}")
-    
-    with tab3:
-        st.subheader("🧠 AI Analysis")
-        
-        # Explanation
-        explanation = safe_get_value(case_data, "explanation", "")
-        if explanation:
-            st.info(explanation)
-        else:
-            st.warning("No AI analysis available")
-        
-        # Summary points
-        summary = safe_get_value(case_data, "summary", [])
-        if summary:
-            if not isinstance(summary, list):
-                summary = [summary]
-            
-            st.subheader("📋 Key Findings")
-            for i, point in enumerate(summary, 1):
-                st.write(f"**{i}.** {point}")
-        
-        # Analysis details in columns
-        analysis_col1, analysis_col2 = st.columns(2)
-        
-        with analysis_col1:
-            scam_patterns = safe_get_value(case_data, "scam_patterns", [])
-            if scam_patterns:
-                if not isinstance(scam_patterns, list):
-                    scam_patterns = [scam_patterns]
-                
-                st.subheader("🔍 Fraud Patterns")
-                for pattern in scam_patterns:
-                    st.write(f"• {pattern}")
-        
-        with analysis_col2:
-            red_flags = safe_get_value(case_data, "red_flags", [])
-            if red_flags:
-                if not isinstance(red_flags, list):
-                    red_flags = [red_flags]
-                
-                st.subheader("🚩 Red Flags")
-                for flag in red_flags:
-                    st.write(f"🚩 {flag}")
-    
-    with tab4:
-        st.subheader("⚖️ Law Enforcement Actions")
-        
-        recommendations = safe_get_value(case_data, "recommendations", [])
-        if recommendations:
-            if not isinstance(recommendations, list):
-                recommendations = [recommendations]
-            
-            st.subheader("📋 Recommended Actions")
-            for i, rec in enumerate(recommendations, 1):
-                st.write(f"**{i}.** {rec}")
-        else:
-            st.info("No specific recommendations available")
-        
-        # Priority assessment
-        st.divider()
-        st.subheader("🎯 Priority Assessment")
-        
-        priority_score = 0
-        factors = []
-        
-        if safe_get_value(case_data, "is_scam", False):
-            priority_score += 40
-            factors.append("✅ Confirmed fraud")
-        
-        threat = safe_get_value(case_data, "threat_level", "").upper()
-        if threat == "HIGH":
-            priority_score += 30
-            factors.append("🔥 High threat level")
-        elif threat == "MEDIUM":
-            priority_score += 20
-            factors.append("⚠️ Medium threat level")
-        
-        likes = safe_get_value(case_data, "page_like_count", 0)
-        if likes > 10000:
-            priority_score += 20
-            factors.append("📈 High public exposure")
-        elif likes > 1000:
-            priority_score += 10
-            factors.append("📊 Moderate public exposure")
-        
-        reports = safe_get_value(case_data, "report_count", 0)
-        if reports > 5:
-            priority_score += 10
-            factors.append("📢 Multiple complaints")
-        
-        # Display priority
-        priority_col1, priority_col2 = st.columns(2)
-        
-        with priority_col1:
-            st.metric("Priority Score", f"{priority_score}/100")
-        
-        with priority_col2:
-            if priority_score >= 70:
-                st.error("🚨 CRITICAL PRIORITY")
-            elif priority_score >= 40:
-                st.warning("⚠️ HIGH PRIORITY")  
-            elif priority_score >= 20:
-                st.info("📋 STANDARD PRIORITY")
-            else:
-                st.success("📝 LOW PRIORITY")
-        
-        if factors:
-            st.subheader("Priority Factors")
-            for factor in factors:
-                st.write(f"• {factor}")
+            st.markdown(
+                """
+                <div class='placeholder-panel'>
+                    <strong>📌 No ad selected</strong><br/><br/>
+                    Click any row in the table above to view comprehensive analysis including:<br/>
+                    • Red flags and scam patterns<br/>
+                    • Extracted links and evidence<br/>
+                    • AI-powered recommendations<br/><br/>
+                    <em>💡 Tip: Sort by Threat Level or Reports to prioritize high-risk items</em>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-def render_analytics_view(df: pd.DataFrame):
-    """Render advanced analytics dashboard"""
-    st.header("📊 Advanced Threat Analytics")
-    
-    if len(df) == 0:
-        st.warning("No data available for analysis")
-        return
-    
-    try:
-        # Time series analysis
-        if "date_scraped" in df.columns:
-            st.subheader("📈 Threat Timeline")
-            
-            df_time = df.copy()
-            df_time["date_scraped"] = pd.to_datetime(df_time["date_scraped"], errors="coerce")
-            df_time = df_time.dropna(subset=["date_scraped"])
-            
-            if len(df_time) > 0:
-                # Daily aggregation
-                daily_stats = df_time.groupby([
-                    df_time["date_scraped"].dt.date,
-                    "is_scam"
-                ]).size().reset_index(name="count")
-                
-                if not daily_stats.empty:
-                    fig_timeline = px.line(
-                        daily_stats,
-                        x="date_scraped",
-                        y="count", 
-                        color="is_scam",
-                        title="Daily Threat Detection Timeline",
-                        labels={"date_scraped": "Date", "count": "Cases", "is_scam": "Is Threat"},
-                        color_discrete_map={True: "#ff6b6b", False: "#51cf66"}
-                    )
-                    fig_timeline.update_layout(height=400)
-                    st.plotly_chart(fig_timeline, use_container_width=True)
-        
-        # Advanced analytics in columns
-        analytics_col1, analytics_col2, analytics_col3 = st.columns(3)
-        
-        with analytics_col1:
-            # Top scam types
-            if "scam_type" in df.columns and "is_scam" in df.columns:
-                threat_df = df[df["is_scam"] == True]
-                if len(threat_df) > 0:
-                    scam_types = threat_df["scam_type"].value_counts().head(10)
-                    if not scam_types.empty:
-                        fig_types = px.bar(
-                            x=scam_types.values,
-                            y=scam_types.index,
-                            orientation="h",
-                            title="Top Threat Types",
-                            color=scam_types.values,
-                            color_continuous_scale="Reds"
-                        )
-                        fig_types.update_layout(height=400, showlegend=False)
-                        st.plotly_chart(fig_types, use_container_width=True)
-        
-        with analytics_col2:
-            # Report distribution
-            if "report_count" in df.columns:
-                df["report_bins"] = pd.cut(
-                    df["report_count"],
-                    bins=[0, 1, 5, 10, float("inf")],
-                    labels=["0", "1-5", "6-10", "10+"],
-                    include_lowest=True
-                )
-                report_dist = df["report_bins"].value_counts()
-                
-                if not report_dist.empty:
-                    fig_reports = px.bar(
-                        x=report_dist.index,
-                        y=report_dist.values,
-                        title="Citizen Report Distribution",
-                        color=report_dist.values,
-                        color_continuous_scale="Blues"
-                    )
-                    fig_reports.update_layout(height=400, showlegend=False)
-                    st.plotly_chart(fig_reports, use_container_width=True)
-        
-        with analytics_col3:
-            # Reach vs threat correlation
-            if "page_like_count" in df.columns and "is_scam" in df.columns:
-                df["reach_category"] = pd.cut(
-                    df["page_like_count"],
-                    bins=[0, 100, 1000, 10000, float("inf")],
-                    labels=["<100", "100-1K", "1K-10K", "10K+"],
-                    include_lowest=True
-                )
-                
-                reach_threat = df.groupby(["reach_category", "is_scam"]).size().unstack(fill_value=0)
-                
-                if not reach_threat.empty:
-                    fig_reach = px.bar(
-                        reach_threat.reset_index(),
-                        x="reach_category",
-                        y=[True, False],
-                        title="Social Reach vs Threat Status",
-                        color_discrete_map={True: "#ff6b6b", False: "#51cf66"},
-                        barmode="stack"
-                    )
-                    fig_reach.update_layout(height=400)
-                    st.plotly_chart(fig_reach, use_container_width=True)
-        
-        # Summary analytics
-        st.subheader("📊 Intelligence Summary")
-        
-        summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
-        
-        with summary_col1:
-            if "is_scam" in df.columns:
-                threat_rate = (len(df[df["is_scam"] == True]) / len(df) * 100) if len(df) > 0 else 0
-                st.metric("🎯 Threat Rate", f"{threat_rate:.1f}%")
-        
-        with summary_col2:
-            if "threat_level" in df.columns:
-                high_threats = len(df[df["threat_level"].astype(str).str.upper() == "HIGH"])
-                st.metric("🔥 Critical Cases", high_threats)
-        
-        with summary_col3:
-            if "reported" in df.columns:
-                enforcement_rate = (len(df[df["reported"] == 1]) / len(df) * 100) if len(df) > 0 else 0
-                st.metric("📧 Enforcement Rate", f"{enforcement_rate:.1f}%")
-        
-        with summary_col4:
-            if "page_like_count" in df.columns:
-                avg_reach = df["page_like_count"].mean()
-                st.metric("📈 Avg Reach", format_number(avg_reach))
-                
-    except Exception as e:
-        logger.error(f"Error in analytics view: {e}")
-        st.error(f"Analytics error: {str(e)}")
+    else:
+        st.warning("⚠️ No data columns available for display. Please refresh the data.")
 
-# Main application
-def main():
-    """Main application entry point"""
-    try:
-        # Initialize session state
-        initialize_session_state()
-        
-        # Render header
-        render_header()
-        
-        # Main layout
-        with st.sidebar:
-            render_system_status()
-            st.divider()
-            render_data_controls()
-            st.divider()
-            render_view_selector()
-            st.divider()
-            render_filters()
-        
-        # Load and process data
-        if st.session_state.data is None and not st.session_state.loading:
-            with st.spinner("Loading initial data..."):
-                data, error = load_data_from_api()
-                if error:
-                    st.session_state.error_message = error
-                    st.error(f"❌ {error}")
-                else:
-                    st.session_state.data = data
-                    st.session_state.last_refresh = datetime.datetime.now()
-        
-        # Process data if available
-        if st.session_state.data:
-            try:
-                df = pd.DataFrame(st.session_state.data)
-                df = preprocess_dataframe(df)
-                df_filtered = apply_filters(df)
-                
-                # Render metrics
-                render_metrics(df_filtered)
-                
-                # Route to appropriate view
-                if st.session_state.view_mode == "analytics":
-                    render_analytics_view(df_filtered)
-                elif st.session_state.view_mode == "detailed":
-                    if st.session_state.selected_row_id:
-                        # Find selected case
-                        selected_case = df[df["id"] == st.session_state.selected_row_id]
-                        if not selected_case.empty:
-                            render_detailed_view(selected_case.iloc[0].to_dict())
-                        else:
-                            st.warning("Selected case not found")
-                            st.session_state.view_mode = "overview"
-                            st.rerun()
-                    else:
-                        # Auto-select high priority case
-                        high_priority = df_filtered[
-                            (df_filtered.get("is_scam", False) == True) &
-                            (df_filtered.get("threat_level", "").astype(str).str.upper() == "HIGH")
-                        ]
-                        if not high_priority.empty:
-                            render_detailed_view(high_priority.iloc[0].to_dict())
-                        else:
-                            st.info("No high-priority cases found. Select a case from the overview.")
-                            st.session_state.view_mode = "overview"
-                            st.rerun()
-                else:  # overview mode
-                    render_overview_charts(df_filtered)
-                    st.divider()
-                    render_data_table(df_filtered)
-                    
-            except Exception as e:
-                logger.error(f"Error processing data: {e}")
-                st.error(f"Data processing error: {str(e)}")
-                
-        else:
-            # No data available
-            st.info("🔌 **System Ready** - Click 'Refresh Data' to load intelligence records")
-            
-            with st.expander("📋 System Information", expanded=True):
-                st.markdown("""
-                ### 🛡️ Cybercrime Detection System
-                
-                This dashboard provides real-time intelligence analysis for cybercrime detection and law enforcement.
-                
-                **Key Features:**
-                - 🤖 AI-powered threat classification
-                - 📊 Real-time analytics and reporting  
-                - ⚖️ Law enforcement integration
-                - 🔍 Advanced case investigation tools
-                - 📈 Trend analysis and insights
-                
-                **System Requirements:**
-                - Active internet connection
-                - Configured API endpoints
-                - Valid authentication credentials
-                """)
-        
-        # Footer
-        st.divider()
-        footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
-        
-        with footer_col2:
-            st.markdown("""
-            <div style="text-align: center; padding: 1rem;">
-                <h4>🛡️ Cybercrime Detection Dashboard</h4>
-                <p><strong>AI-Powered • Real-time • Secure</strong></p>
-                <p><em>Protecting citizens through advanced threat intelligence</em></p>
-                <small>© 2024 Cybercrime Intelligence Unit</small>
-            </div>
-            """, unsafe_allow_html=True)
-            
-    except Exception as e:
-        logger.error(f"Critical application error: {e}")
-        st.error("🚨 Critical system error occurred. Please refresh the application.")
-        st.exception(e)
+else:
+    # Empty state with better UX
+    st.info("👋 **Welcome to the Scam Detection Dashboard**")
 
-if __name__ == "__main__":
-    main()
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.markdown(
+            """
+        ### Getting Started
+        
+        1. Click the **'🔄 Refresh Data'** button in the sidebar to load the latest scam detection data
+        2. Use filters to narrow down specific types of scams or threat levels
+        3. Click on any row to view detailed analysis
+        4. Report suspicious ads directly to authorities
+        
+        The system automatically crawls and analyzes ads every 3 days to keep the database current.
+        """
+        )
+
+    with col2:
+        st.info(
+            """
+        **Quick Stats**
+        
+        Real-time scam detection powered by AI
+        
+        Multi-level threat classification
+        
+        Direct reporting to law enforcement
+        """
+        )
+
+# Footer
+st.divider()
+col_footer1, col_footer2 = st.columns([3, 1])
+with col_footer1:
+    st.caption(
+        "🛡️ **Scam Detection Dashboard** | Built with Streamlit | For Law Enforcement Use"
+    )
+with col_footer2:
+    if st.session_state.data_loaded:
+        st.caption(
+            f"✅ Data loaded: {len(st.session_state.data) if st.session_state.data else 0} records"
+        )
